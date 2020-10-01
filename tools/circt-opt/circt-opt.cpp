@@ -50,6 +50,7 @@ static cl::opt<bool>
 
                    cl::desc("Split the input file into pieces and process each "
                             "chunk independently"),
+
                    cl::init(false));
 
 static cl::opt<bool>
