@@ -12,9 +12,10 @@ jobs:
       with:
         submodules: 'false'
         ref: ${{ github.head_ref }}
-        fetch-depth: 5
+        fetch-depth: 2
     - name: clang-format
       run: |
+        # Run clang-format
         CHANGED_FILES=`git diff --name-only -r HEAD~ | grep -E '.(c|cpp|h|hpp)$' | xargs`
         echo "Changed files: $CHANGED_FILES"
         [ -z "$CHANGED_FILES" ] && exit 0
@@ -30,6 +31,12 @@ jobs:
     - name: Upload clang-format patch
       uses: actions/upload-artifact@v2
       if: ${{ failure() }}
+      # Unfortunately, artifact uploads are always zips :(
       with:
-        name: clang-format.patch
+        name: clang-format-patch
         path: clang-format.patch
+    - name: clang-format patch display
+      if: ${{ failure() }}
+      run: |
+        # Display patch
+        cat clang-format.patch
