@@ -54,6 +54,7 @@ static cl::opt<bool>
                    cl::init(false));
 
 static cl::opt<bool>
+
     verifyDiagnostics("verify-diagnostics",
                       cl::desc("Check that emitted diagnostics match "
                                "expected-* lines on the corresponding line"),
