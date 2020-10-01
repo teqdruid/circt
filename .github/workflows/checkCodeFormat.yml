@@ -13,11 +13,14 @@ jobs:
         submodules: 'false'
     - name: clang-format
       run: |
-        git clang-format --diff HEAD~ | tee clang-format.patch
-        grep "clang-format did not modify any files" clang-format.patch
-        # if [ $? -ne 0 ]; then
-          # exit 1
-        # fi
+        CHANGED_FILES=`git diff --name-only HEAD~1 | grep -E '.(c|cpp|h|hpp)$' | xargs`
+        clang-format -i $CHANGED_FILES
+        git diff > clang-format.patch
+        if [ -s clang-format.patch ]; then
+          exit 0
+        fi
+        echo "Clang-format found formatting problems. See diff in the clang-format.patch artifact."
+        exit 1
     - name: Upload clang-format patch
       uses: actions/upload-artifact@v2
       with:
