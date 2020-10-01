@@ -12,12 +12,9 @@ jobs:
       with:
         submodules: 'false'
         ref: ${{ github.head_ref }}
+        fetch-depth: 5
     - name: clang-format
       run: |
-        ls -alh
-        git status
-        cat .git/config
-        cd $GITHUB_WORKSPACE
         CHANGED_FILES=`git diff --name-only -r HEAD~ | grep -E '.(c|cpp|h|hpp)$' | xargs`
         [ -z "$CHANGED_FILES" ] && exit 0
         clang-format -i $CHANGED_FILES
@@ -27,6 +24,7 @@ jobs:
         exit 1
     - name: Upload clang-format patch
       uses: actions/upload-artifact@v2
+      if: ${{ failure() }}
       with:
         # name: clang-format.patch
         path: clang-format.patch

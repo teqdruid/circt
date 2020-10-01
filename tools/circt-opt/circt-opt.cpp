@@ -47,6 +47,7 @@ cl::value_desc("filename"),
 
 static cl::opt<bool>
     splitInputFile("split-input-file",
+
                    cl::desc("Split the input file into pieces and process each "
                             "chunk independently"),
                    cl::init(false));
