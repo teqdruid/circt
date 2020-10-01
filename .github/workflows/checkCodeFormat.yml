@@ -1,0 +1,25 @@
+name: Check code format
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Check with clang-format
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get CIRCT
+      uses: actions/checkout@v2
+      with:
+        submodules: 'false'
+    - name: clang-format
+      run: |
+        git clang-format --diff HEAD~ | tee clang-format.patch
+        grep "clang-format did not modify any files" clang-format.patch
+        # if [ $? -ne 0 ]; then
+          # exit 1
+        # fi
+    - name: Upload clang-format patch
+      uses: actions/upload-artifact@v2
+      with:
+        # name: clang-format.patch
+        path: clang-format.patch
