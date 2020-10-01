@@ -34,11 +34,15 @@ using namespace llvm;
 using namespace mlir;
 using namespace circt;
 
-static cl::opt<std::string>
-    inputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
+static cl::opt<std::string>    inputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
 
-static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
-                                           cl::value_desc("filename"),
+static cl::opt<std::string> 
+
+
+
+
+outputFilename("o", cl::desc("Output filename"),
+cl::value_desc("filename"),
                                            cl::init("-"));
 
 static cl::opt<bool>
