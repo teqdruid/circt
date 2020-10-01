@@ -13,8 +13,9 @@ jobs:
         submodules: 'false'
     - name: clang-format
       run: |
+        set -e
         cd $GITHUB_WORKSPACE
-        CHANGED_FILES=`git diff --name-only HEAD~1 | grep -E '.(c|cpp|h|hpp)$' | xargs`
+        CHANGED_FILES=`git diff --name-only -r HEAD~ | grep -E '.(c|cpp|h|hpp)$' | xargs`
         clang-format -i $CHANGED_FILES
         git diff > clang-format.patch
         if [ -s clang-format.patch ]; then
