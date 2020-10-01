@@ -11,19 +11,18 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: 'false'
+        ref: ${{ github.head_ref }}
     - name: clang-format
       run: |
-        set -e
         ls -alh
         git status
         cat .git/config
         cd $GITHUB_WORKSPACE
         CHANGED_FILES=`git diff --name-only -r HEAD~ | grep -E '.(c|cpp|h|hpp)$' | xargs`
+        [ -z "$CHANGED_FILES" ] && exit 0
         clang-format -i $CHANGED_FILES
         git diff > clang-format.patch
-        if [ -s clang-format.patch ]; then
-          exit 0
-        fi
+        [ -s clang-format.patch ] && exit 0
         echo "Clang-format found formatting problems. See diff in the clang-format.patch artifact."
         exit 1
     - name: Upload clang-format patch
