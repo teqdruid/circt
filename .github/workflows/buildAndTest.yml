@@ -99,13 +99,13 @@ jobs:
         exit 0
     - name: Upload clang-format patch
       uses: actions/upload-artifact@v2
-      if: steps.clang-format.status == 'failure'
+      if: jobs.build.steps.clang-format.status == 'failure'
       # Unfortunately, artifact uploads are always zips :(
       with:
         name: clang-format-patch
         path: clang-format.patch
     - name: clang-format patch display
-      if: steps.clang-format.status == 'failure'
+      if: jobs.build.steps.clang-format.status == 'failure'
       run: |
         # Display patch
         cat clang-format.patch
