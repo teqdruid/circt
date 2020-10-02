@@ -63,14 +63,15 @@ jobs:
         cmake --build . --target install -- -j$(nproc)
 
     - name: clang-format
+      continue-on-error: true
       env:
-        PR_BASE: github.event.pull_request.base.sha
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
       run: |
         # Run clang-format
-        if [ -z "$PR_BASE" ]; then
+        if [[ -z "$PR_BASE" ]]; then
           DIFF_COMMIT="HEAD^"
-        elif
-          DIFF_COMMIT=$PR_BASE
+        else
+          DIFF_COMMIT="$PR_BASE"
         fi
         echo "Git diff'ing against $DIFF_COMMIT"
         CHANGED_FILES=`git diff --name-only -r $DIFF_COMMIT | grep -E '.(c|cpp|h|hpp)$' | xargs`
