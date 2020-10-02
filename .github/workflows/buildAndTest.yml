@@ -99,13 +99,13 @@ jobs:
         exit 0
     - name: Upload clang-format patch
       uses: actions/upload-artifact@v2
-      if: build.steps.clang-format.status == 'failure'
-      # Unfortunately, artifact uploads are always zips :(
+      if: ${{ steps.clang-format.status == 'failure' }}
       with:
         name: clang-format-patch
         path: clang-format.patch
+    # Unfortunately, artifact uploads are always zips so display the diff as well
     - name: clang-format patch display
-      if: build.steps.clang-format.status == 'failure'
+      if: ${{ steps.clang-format.status == 'failure' }}
       run: |
         # Display patch
         cat clang-format.patch
