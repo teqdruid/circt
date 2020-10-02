@@ -63,8 +63,9 @@ jobs:
         cmake --build . --target install -- -j$(nproc)
 
     - name: clang-format
+      continue-on-error: true
       env:
-        PR_BASE: github.event.pull_request.base.sha
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
       run: |
         # Run clang-format
         if [[ -z "$PR_BASE" ]]; then
