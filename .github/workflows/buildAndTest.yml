@@ -61,6 +61,9 @@ jobs:
         cd llvm/build
         cmake ../llvm -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_INSTALL_PREFIX=../install -DLLVM_ENABLE_PROJECTS='mlir' -DLLVM_OPTIMIZED_TABLEGEN=ON -DLLVM_ENABLE_OCAMLDOC=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_INSTALL_UTILS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
         cmake --build . --target install -- -j$(nproc)
+    - name: clang-format lint
+      uses: DoozyX/clang-format-lint-action@v0.10
+
     - name: Build and Test CIRCT (Assert)
       run: |
         mkdir build_assert
@@ -73,41 +76,3 @@ jobs:
         cd build_release
         cmake .. -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=OFF -DMLIR_DIR=../llvm/install/lib/cmake/mlir/ -DLLVM_DIR=../llvm/install/lib/cmake/llvm/ -DCMAKE_LINKER=lld -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_EXTERNAL_LIT=`pwd`/../llvm/build/bin/llvm-lit
         make check-circt -j$(nproc)
-
-    - name: clang-format
-      env:
-        PR_BASE: ${{ github.event.pull_request.base.sha }}
-      run: |
-        # Run clang-format
-        if [[ -z "$PR_BASE" ]]; then
-          DIFF_COMMIT="HEAD^"
-        else
-          DIFF_COMMIT="$PR_BASE"
-        fi
-        echo "Git diff'ing against $DIFF_COMMIT"
-        CHANGED_FILES=`git diff --name-only -r $DIFF_COMMIT | grep -E '.(c|cpp|h|hpp)$' | xargs`
-        echo "Changed files: $CHANGED_FILES"
-        [ -z "$CHANGED_FILES" ] && exit 0
-        clang-format -i $CHANGED_FILES
-        git diff > clang-format.patch
-        if [ -s clang-format.patch ]; then
-          echo "Clang-format found formatting problems in the following files. See diff in the clang-format.patch artifact."
-          git diff --name-only 
-          exit 1
-        fi
-        echo "Clang-format found no formatting problems"
-        exit 0
-    - name: Upload clang-format patch
-      uses: actions/upload-artifact@v2
-      continue-on-error: true
-      if: ${{ failure() }}
-      with:
-        name: clang-format-patch
-        path: clang-format.patch
-    # Unfortunately, artifact uploads are always zips so display the diff as well
-    - name: clang-format patch display
-      if: ${{ failure() }}
-      continue-on-error: true
-      run: |
-        # Display patch
-        cat clang-format.patch
