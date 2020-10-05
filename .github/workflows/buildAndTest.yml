@@ -61,8 +61,9 @@ jobs:
         cd llvm/build
         cmake ../llvm -DLLVM_BUILD_EXAMPLES=OFF -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_INSTALL_PREFIX=../install -DLLVM_ENABLE_PROJECTS='mlir' -DLLVM_OPTIMIZED_TABLEGEN=ON -DLLVM_ENABLE_OCAMLDOC=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_INSTALL_UTILS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
         cmake --build . --target install -- -j$(nproc)
-    - name: clang-format lint
-      uses: DoozyX/clang-format-lint-action@v0.10
+
+    - name: git-clang-format lint
+      uses: yshui/git-clang-format-lint@v1.3
 
     - name: Build and Test CIRCT (Assert)
       run: |
