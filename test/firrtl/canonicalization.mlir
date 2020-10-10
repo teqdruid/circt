@@ -35,6 +35,10 @@ firrtl.module @And(%in: !firrtl.uint<4>,
   firrtl.connect %out, %4 : !firrtl.flip<uint<4>>, !firrtl.uint<4>
 }
 
+
+
+
+
 // CHECK-LABEL: firrtl.module @Or
 firrtl.module @Or(%in: !firrtl.uint<4>,
                    %out: !firrtl.flip<uint<4>>) {
