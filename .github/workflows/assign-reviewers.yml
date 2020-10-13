@@ -18,4 +18,4 @@ jobs:
           DEBUG: '*'
 
       - name: Store response payload to file
-        run: echo '${{ fromJSON(steps.herald.outputs.appliedRules) }}'
+        run: echo '${{ steps.herald.outputs.appliedRules }}'
