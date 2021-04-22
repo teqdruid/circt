@@ -66,6 +66,7 @@ class InstanceBuilder:
     # Actually build the InstanceOp.
     instance_name = StringAttr.get(name)
     module_name = FlatSymbolRefAttr.get(StringAttr(module.name).value)
+    parameters = {k: Attribute.parse(str(v)) for (k, v) in parameters.items()}
     parameters = DictAttr.get(parameters)
     self.__instance__ = InstanceOp(
         module.type.results,

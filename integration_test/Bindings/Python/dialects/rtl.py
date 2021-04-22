@@ -76,8 +76,12 @@ with Context() as ctx, Location.unknown():
       inst4 = two_inputs.create("inst4", {"a": inst1.a})
       inst4.b = inst1.a
 
+      # CHECK: %[[INST5_VAL:.+]] = rtl.instance "inst5" @MyWidget(%[[INST5_VAL]])
       inst5 = op.create("inst5")
       inst5.my_input = inst5.my_output
+
+      # CHECK: rtl.instance "inst6" {{.*}} {BANKS = 2 : i64}
+      inst6 = one_input.create("inst6", {"a": inst1.a}, parameters={"BANKS": 2})
 
       rtl.OutputOp([])
 
