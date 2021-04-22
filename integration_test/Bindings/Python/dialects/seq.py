@@ -1,10 +1,13 @@
 # REQUIRES: bindings_python
 # RUN: %PYTHON% %s | FileCheck %s
 
+import sys
+
 import circt
 from circt.dialects import rtl, seq
 
 from mlir.ir import *
+from mlir.passmanager import PassManager
 
 with Context() as ctx, Location.unknown():
   circt.register_dialects(ctx)
@@ -12,6 +15,7 @@ with Context() as ctx, Location.unknown():
   i1 = IntegerType.get_signless(1)
   i32 = IntegerType.get_signless(32)
 
+  # CHECK-LABEL: === MLIR ===
   m = Module.create()
   with InsertionPoint(m.body):
 
@@ -26,4 +30,13 @@ with Context() as ctx, Location.unknown():
       # CHECK: rtl.output %[[DATA_VAL]]
       return reg.data
 
+  print("=== MLIR ===")
   print(m)
+
+  # CHECK-LABEL: === Verilog ===
+  print("=== Verilog ===")
+
+  pm = PassManager.parse("lower-seq-to-sv")
+  pm.run(m)
+  # CHECK: always_ff @(posedge clk)
+  circt.export_verilog(m, sys.stdout)
