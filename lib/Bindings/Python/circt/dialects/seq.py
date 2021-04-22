@@ -6,9 +6,12 @@
 from mlir.dialects._seq_ops_gen import *
 
 
-def reg(val, clk, rst):
+def reg(val, clk, rst, name=None):
   import circt.dialects.rtl as rtl
   from mlir.ir import IntegerAttr
   valType = val.type
-  reg_reset = rtl.ConstantOp(valType, IntegerAttr.get(valType, 0)).result
-  return CompRegOp(valType, val, clk, rst, reg_reset).result
+  if rst is not None:
+    reg_reset = rtl.ConstantOp(valType, IntegerAttr.get(valType, 0)).result
+    return CompRegOp(valType, val, clk, rst, reg_reset, name=name).result
+  else:
+    return CompRegOp(valType, val, clk, None, None, name=name).result
