@@ -22,6 +22,7 @@ add_mlir_python_extension(CIRCTBindingsPythonExtension _circt
     CIRCTCAPIESI
     CIRCTCAPIMSFT
     CIRCTCAPIRTL
+    CIRCTCAPISeq
     CIRCTCAPISV
     CIRCTCAPIExportVerilog
     CIRCTSupport
@@ -111,6 +112,11 @@ add_mlir_dialect_python_bindings(CIRCTBindingsPythonRTLOps
   TD_FILE RTLOps.td
   DIALECT_NAME rtl)
 add_dependencies(CIRCTBindingsPythonSources CIRCTBindingsPythonRTLOps)
+
+add_mlir_dialect_python_bindings(CIRCTBindingsPythonSeqOps
+  TD_FILE SeqOps.td
+  DIALECT_NAME seq)
+add_dependencies(CIRCTBindingsPythonSources CIRCTBindingsPythonSeqOps)
 
 add_mlir_dialect_python_bindings(CIRCTBindingsPythonSVOps
   TD_FILE SVOps.td
