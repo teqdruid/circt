@@ -199,9 +199,10 @@ class RTLModuleOp:
   def create(self,
              name: str,
              input_port_mapping: Dict[str, Value] = {},
+             parameters: Dict[str, object] = {},
              loc=None,
              ip=None):
-    return InstanceBuilder(self, name, input_port_mapping, loc=loc, ip=ip)
+    return InstanceBuilder(self, name, input_port_mapping, parameters=parameters, loc=loc, ip=ip)
 
   @classmethod
   def from_py_func(

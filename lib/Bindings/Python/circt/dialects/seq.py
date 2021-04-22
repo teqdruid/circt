@@ -4,3 +4,11 @@
 
 # Generated tablegen dialects end up in the mlir.dialects package for now.
 from mlir.dialects._seq_ops_gen import *
+
+
+def reg(val, clk, rst):
+  import circt.dialects.rtl as rtl
+  from mlir.ir import IntegerAttr
+  valType = val.type
+  reg_reset = rtl.ConstantOp(valType, IntegerAttr.get(valType, 0)).result
+  return CompRegOp(valType, val, clk, rst, reg_reset).result
