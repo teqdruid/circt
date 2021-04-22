@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Sequential, seq);
+MLIR_CAPI_EXPORTED void registerSeqPasses();
 
 #ifdef __cplusplus
 }

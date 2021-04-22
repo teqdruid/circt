@@ -12,3 +12,5 @@
 #include "mlir/CAPI/Registration.h"
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Sequential, seq, circt::seq::SeqDialect)
+
+void registerSeqPasses() { circt::seq::registerSeqPasses(); }
