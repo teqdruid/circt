@@ -1,60 +1,170 @@
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 import inspect
 
+from circt.support import BackedgeBuilder
+
 from mlir.ir import *
+
+
+class InstanceBuilder:
+  """Helper class to incrementally construct an instance of a module."""
+
+  __slots__ = [
+      "__backedge_builder__",
+      "__backedges__",
+      "__instance__",
+      "__operand_indices__",
+      "__result_indices__",
+  ]
+
+  def __init__(self,
+               module,
+               name,
+               input_port_mapping,
+               *,
+               parameters={},
+               loc=None,
+               ip=None):
+    # Lazily import dependencies to avoid cyclic dependencies.
+    from ._rtl_ops_gen import InstanceOp, ConstantOp
+
+    # Create mappings from port name to value and index.
+    operand_indices = {}
+    operand_values = []
+    result_indices = {}
+
+    # Create a backedge builder for filling in temporary operands.
+    loc = loc or Location.current
+    backedge_builder = BackedgeBuilder(loc)
+    backedges = {}
+
+    arg_names = ArrayAttr(module.attributes["argNames"])
+    for i in range(len(arg_names)):
+      arg_name = StringAttr(arg_names[i]).value
+      operand_indices[arg_name] = i
+
+      if arg_name in input_port_mapping:
+        operand_values.append(input_port_mapping[arg_name])
+      else:
+        type = module.type.inputs[i]
+        backedge = backedge_builder.get(type)
+        operand_values.append(backedge.value)
+        backedges[i] = backedge
+
+    result_names = ArrayAttr(module.attributes["resultNames"])
+    for i in range(len(result_names)):
+      result_name = StringAttr(result_names[i]).value
+      result_indices[result_name] = i
+
+    # Save the builder, backedges, operand, and result indices for later.
+    self.__backedge_builder__ = backedge_builder
+    self.__backedges__ = backedges
+    self.__operand_indices__ = operand_indices
+    self.__result_indices__ = result_indices
+
+    # Actually build the InstanceOp.
+    instance_name = StringAttr.get(name)
+    module_name = FlatSymbolRefAttr.get(StringAttr(module.name).value)
+    parameters = {k: Attribute.parse(str(v)) for (k, v) in parameters.items()}
+    parameters = DictAttr.get(parameters)
+    self.__instance__ = InstanceOp(
+        module.type.results,
+        instance_name,
+        module_name,
+        operand_values,
+        parameters,
+        loc=loc,
+        ip=ip,
+    )
+
+  def __getattr__(self, name):
+    # Check for the attribute in the result name set.
+    if name in self.__result_indices__:
+      index = self.__result_indices__[name]
+      instance = self.__instance__
+      return instance.results[index]
+
+    # If we fell through to here, the name isn't a result.
+    raise AttributeError(f"unknown output port name {name}")
+
+  def __setattr__(self, name, value):
+    # If we are actually setting an InstanceBuilder attribute, just do that.
+    if name in self.__slots__:
+      object.__setattr__(self, name, value)
+      return
+
+    # Check for the attribute in the arg name set.
+    if name in self.__operand_indices__:
+      # Put the value into the instance.
+      index = self.__operand_indices__[name]
+      backedge = self.__backedges__[index]
+      backedge.set_value(value)
+      return
+
+    # If we fell through to here, the name isn't an arg.
+    raise AttributeError(f"unknown input port name {name}")
+
+  @property
+  def operation(self):
+    """Get the operation associated with this builder."""
+    return self.__instance__.operation
 
 
 class RTLModuleOp:
   """Specialization for the RTL module op class."""
 
-  def __init__(self,
-               name,
-               input_ports,
-               output_ports,
-               *,
-               body_builder=None,
-               loc=None,
-               ip=None):
+  def __init__(
+      self,
+      name,
+      input_ports=[],
+      output_ports=[],
+      *,
+      body_builder=None,
+      loc=None,
+      ip=None,
+  ):
     """
-    Create a RTLModuleOp with the provided `name`, `input_ports`, and
-    `output_ports`.
-    - `name` is a string representing the function name.
-    - `input_ports` is a list of pairs of string names and mlir.ir types.
-    - `output_ports` is a list of pairs of string names and mlir.ir types.
-    - `body_builder` is an optional callback, when provided a new entry block
-      is created and the callback is invoked with the new op as argument within
-      an InsertionPoint context already set for the block. The callback is
-      expected to insert a terminator in the block.
-    """
+        Create a RTLModuleOp with the provided `name`, `input_ports`, and
+        `output_ports`.
+        - `name` is a string representing the function name.
+        - `input_ports` is a list of pairs of string names and mlir.ir types.
+        - `output_ports` is a list of pairs of string names and mlir.ir types.
+        - `body_builder` is an optional callback, when provided a new entry block
+          is created and the callback is invoked with the new op as argument within
+          an InsertionPoint context already set for the block. The callback is
+          expected to insert a terminator in the block.
+        """
     operands = []
     results = []
     attributes = {}
-    attributes['sym_name'] = StringAttr.get(str(name))
+    attributes["sym_name"] = StringAttr.get(str(name))
 
     input_types = []
     input_names = []
     for (port_name, port_type) in input_ports:
       input_types.append(port_type)
       input_names.append(StringAttr.get(str(port_name)))
-    attributes['argNames'] = ArrayAttr.get(input_names)
+    attributes["argNames"] = ArrayAttr.get(input_names)
 
     output_types = []
     output_names = []
     for (port_name, port_type) in output_ports:
       output_types.append(port_type)
       output_names.append(StringAttr.get(str(port_name)))
-    attributes['resultNames'] = ArrayAttr.get(output_names)
+    attributes["resultNames"] = ArrayAttr.get(output_names)
 
     attributes["type"] = TypeAttr.get(
         FunctionType.get(inputs=input_types, results=output_types))
 
     super().__init__(
-        self.build_generic(attributes=attributes,
-                           results=results,
-                           operands=operands,
-                           loc=loc,
-                           ip=ip))
+        self.build_generic(
+            attributes=attributes,
+            results=results,
+            operands=operands,
+            loc=loc,
+            ip=ip,
+        ))
 
     if body_builder:
       entry_block = self.add_entry_block()
@@ -83,42 +193,53 @@ class RTLModuleOp:
 
   def add_entry_block(self):
     if not self.is_external:
-      raise IndexError('The module already has an entry block')
+      raise IndexError("The module already has an entry block")
     self.body.blocks.append(*self.type.inputs)
     return self.body.blocks[0]
 
+  def create(self,
+             name: str,
+             input_port_mapping: Dict[str, Value] = {},
+             parameters: Dict[str, object] = {},
+             loc=None,
+             ip=None):
+    return InstanceBuilder(self, name, input_port_mapping, parameters=parameters, loc=loc, ip=ip)
+
   @classmethod
-  def from_py_func(RTLModuleOp,
-                   *inputs: Type,
-                   results: Optional[Sequence[Type]] = None,
-                   name: Optional[str] = None):
+  def from_py_func(
+      RTLModuleOp,
+      *inputs: Type,
+      results: Optional[Sequence[Type]] = None,
+      name: Optional[str] = None,
+  ):
     """Decorator to define an MLIR RTLModuleOp specified as a python function.
-    Requires that an `mlir.ir.InsertionPoint` and `mlir.ir.Location` are
-    active for the current thread (i.e. established in a `with` block).
-    When applied as a decorator to a Python function, an entry block will
-    be constructed for the RTLModuleOp with types as specified in `*inputs`. The
-    block arguments will be passed positionally to the Python function. In
-    addition, if the Python function accepts keyword arguments generally or
-    has a corresponding keyword argument, the following will be passed:
-      * `module_op`: The `module` op being defined.
-    By default, the function name will be the Python function `__name__`. This
-    can be overriden by passing the `name` argument to the decorator.
-    If `results` is not specified, then the decorator will implicitly
-    insert a `OutputOp` with the `Value`'s returned from the decorated
-    function. It will also set the `RTLModuleOp` type with the actual return
-    value types. If `results` is specified, then the decorated function
-    must return `None` and no implicit `OutputOp` is added (nor are the result
-    types updated). The implicit behavior is intended for simple, single-block
-    cases, and users should specify result types explicitly for any complicated
-    cases.
-    The decorated function can further be called from Python and will insert
-    a `InstanceOp` at the then-current insertion point, returning either None (
-    if no return values), a unary Value (for one result), or a list of Values).
-    This mechanism cannot be used to emit recursive calls (by construction).
-    """
+        Requires that an `mlir.ir.InsertionPoint` and `mlir.ir.Location` are
+        active for the current thread (i.e. established in a `with` block).
+        When applied as a decorator to a Python function, an entry block will
+        be constructed for the RTLModuleOp with types as specified in `*inputs`. The
+        block arguments will be passed positionally to the Python function. In
+        addition, if the Python function accepts keyword arguments generally or
+        has a corresponding keyword argument, the following will be passed:
+          * `module_op`: The `module` op being defined.
+        By default, the function name will be the Python function `__name__`. This
+        can be overriden by passing the `name` argument to the decorator.
+        If `results` is not specified, then the decorator will implicitly
+        insert a `OutputOp` with the `Value`'s returned from the decorated
+        function. It will also set the `RTLModuleOp` type with the actual return
+        value types. If `results` is specified, then the decorated function
+        must return `None` and no implicit `OutputOp` is added (nor are the result
+        types updated). The implicit behavior is intended for simple, single-block
+        cases, and users should specify result types explicitly for any complicated
+        cases.
+        The decorated function can further be called from Python and will insert
+        a `InstanceOp` at the then-current insertion point, returning either None (
+        if no return values), a unary Value (for one result), or a list of Values).
+        This mechanism cannot be used to emit recursive calls (by construction).
+        """
 
     def decorator(f):
       from circt.dialects import rtl
+
       # Introspect the callable for optional features.
       sig = inspect.signature(f)
       has_arg_module_op = False
@@ -172,15 +293,19 @@ class RTLModuleOp:
           module_op.attributes["type"] = TypeAttr.get(function_type)
           # Set required resultNames attribute. Could we infer real names here?
           resultNames = [
-              StringAttr.get('result' + str(i))
+              StringAttr.get("result" + str(i))
               for i in range(len(return_values))
           ]
           module_op.attributes["resultNames"] = ArrayAttr.get(resultNames)
 
       def emit_instance_op(*call_args):
-        call_op = rtl.InstanceOp(return_types, StringAttr.get(''),
-                                 FlatSymbolRefAttr.get(symbol_name), call_args,
-                                 DictAttr.get({}))
+        call_op = rtl.InstanceOp(
+            return_types,
+            StringAttr.get(""),
+            FlatSymbolRefAttr.get(symbol_name),
+            call_args,
+            DictAttr.get({}),
+        )
         if return_types is None:
           return None
         elif len(return_types) == 1:

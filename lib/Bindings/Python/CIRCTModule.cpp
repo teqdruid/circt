@@ -7,12 +7,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "DialectModules.h"
+#include "SupportModule.h"
 
 #include "circt-c/Dialect/Comb.h"
 #include "circt-c/Dialect/ESI.h"
 #include "circt-c/Dialect/MSFT.h"
 #include "circt-c/Dialect/RTL.h"
 #include "circt-c/Dialect/SV.h"
+#include "circt-c/Dialect/Seq.h"
 #include "circt-c/ExportVerilog.h"
 #include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir-c/Registration.h"
@@ -23,7 +25,10 @@
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
 
-static void registerPasses() { registerSVPasses(); }
+static void registerPasses() {
+  registerSeqPasses();
+  registerSVPasses();
+}
 
 PYBIND11_MODULE(_circt, m) {
   m.doc() = "CIRCT Python Native Extension";
@@ -54,6 +59,10 @@ PYBIND11_MODULE(_circt, m) {
         mlirDialectHandleRegisterDialect(rtl, context);
         mlirDialectHandleLoadDialect(rtl, context);
 
+        MlirDialectHandle seq = mlirGetDialectHandle__seq__();
+        mlirDialectHandleRegisterDialect(seq, context);
+        mlirDialectHandleLoadDialect(seq, context);
+
         MlirDialectHandle sv = mlirGetDialectHandle__sv__();
         mlirDialectHandleRegisterDialect(sv, context);
         mlirDialectHandleLoadDialect(sv, context);
@@ -70,4 +79,6 @@ PYBIND11_MODULE(_circt, m) {
   circt::python::populateDialectESISubmodule(esi);
   py::module msft = m.def_submodule("msft", "MSFT API");
   circt::python::populateDialectMSFTSubmodule(msft);
+  py::module support = m.def_submodule("_support", "Support API");
+  circt::python::populateSupportSubmodule(support);
 }

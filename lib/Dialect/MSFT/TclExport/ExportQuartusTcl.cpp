@@ -122,6 +122,8 @@ LogicalResult Entity::emit(Operation *op, StringRef attrKey, StringRef instName,
   // To which entity does this apply?
   s.os << " -to ";
   emitPath();
+  if (auto name = op->getAttrOfType<StringAttr>("name"))
+    s.os << name.getValue() << '|';
   // If instance name is specified, add it in between the parent entity path and
   // the child entity patch.
   if (!instName.empty())
