@@ -7,6 +7,7 @@ import mlir.ir
 
 from _circt._esi import *
 import circt
+from circt.dialects.esi import *
 
 import sys
 import os

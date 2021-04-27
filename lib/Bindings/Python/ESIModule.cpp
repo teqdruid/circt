@@ -99,7 +99,7 @@ void circt::python::populateDialectESISubmodule(py::module &m) {
         "Construct an ESI wrapper around RTL module 'op' given a list of "
         "latency-insensitive ports.",
         py::arg("op"), py::arg("name_list"));
-  m.def("channel_type", &channelType,
+  m.def("channel_of", &channelType,
         "Create an ESI channel type which wraps the argument type");
 
   py::class_<System>(m, "CppSystem")
