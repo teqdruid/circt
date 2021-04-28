@@ -115,7 +115,7 @@ static void getTypeDims(SmallVectorImpl<int64_t> &dims, Type type,
     return getTypeDims(dims, uarray.getElementType(), loc);
   if (type.isa<InterfaceType>())
     return;
-  if (type.isa<StructType>())
+  if (type.isa<StructType>() || type.isa<UnionType>())
     return;
 
   int width;
@@ -237,6 +237,17 @@ static bool printPackedTypeImpl(Type type, raw_ostream &os, Location loc,
           SmallVector<size_t, 8> structDims;
           printPackedTypeImpl(stripUnpackedTypes(element.type), os, loc,
                               structDims, /*implicitIntType=*/false);
+          os << ' ' << element.name << "; ";
+        }
+        os << '}';
+        return true;
+      })
+      .Case<UnionType>([&](UnionType unionType) {
+        os << "union packed {";
+        for (auto &element : unionType.getElements()) {
+          SmallVector<size_t, 8> dims;
+          printPackedTypeImpl(stripUnpackedTypes(element.type), os, loc, dims,
+                              /*implicitIntType=*/false);
           os << ' ' << element.name << "; ";
         }
         os << '}';
@@ -768,6 +779,8 @@ private:
   SubExprInfo visitTypeOp(StructCreateOp op);
   SubExprInfo visitTypeOp(StructExtractOp op);
   SubExprInfo visitTypeOp(StructInjectOp op);
+  SubExprInfo visitTypeOp(UnionExtractOp op);
+  SubExprInfo visitTypeOp(UnionCreateOp op);
 
   // Comb Dialect Operations
   using CombinationalVisitor::visitComb;
@@ -1279,6 +1292,20 @@ SubExprInfo ExprEmitter::visitTypeOp(StructInjectOp op) {
                         });
   os << '}';
   return {Selection, IsUnsigned};
+}
+
+SubExprInfo ExprEmitter::visitTypeOp(UnionExtractOp op) {
+  emitSubExpr(op.input(), Selection, OOLUnary);
+  os << '.' << op.field();
+  return {Selection, IsUnsigned};
+}
+
+SubExprInfo ExprEmitter::visitTypeOp(UnionCreateOp op) {
+  UnionType utype = op.getType();
+  os << "'{" << op.field() << ": ";
+  emitSubExpr(op.input(), Selection, OOLBinary);
+  os << '}';
+  return {Unary, IsUnsigned};
 }
 
 SubExprInfo ExprEmitter::visitUnhandledExpr(Operation *op) {

@@ -32,6 +32,8 @@ public:
                        ArraySliceOp, ArrayCreateOp, ArrayConcatOp, ArrayGetOp,
                        // Struct operations
                        StructCreateOp, StructExtractOp, StructInjectOp,
+                       // Union operations
+                       UnionCreateOp, UnionExtractOp,
                        // Cast operation
                        BitcastOp>([&](auto expr) -> ResultType {
           return thisCast->visitTypeOp(expr, args...);
@@ -64,6 +66,8 @@ public:
   HANDLE(StructCreateOp, Unhandled);
   HANDLE(StructExtractOp, Unhandled);
   HANDLE(StructInjectOp, Unhandled);
+  HANDLE(UnionCreateOp, Unhandled);
+  HANDLE(UnionExtractOp, Unhandled);
   HANDLE(ArraySliceOp, Unhandled);
   HANDLE(ArrayGetOp, Unhandled);
   HANDLE(ArrayCreateOp, Unhandled);

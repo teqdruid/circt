@@ -672,3 +672,9 @@ rtl.module @out_of_order_multi_result() -> (%b: i1, %c: i2) {
   // CHECK: assign c = _T_0 + _T_0;
   rtl.output %b, %c : i1, i2
 }
+
+rtl.module @UnionOps(%a: !rtl.union<foo: i1, bar: i3>) -> (%x: i3, %z: !rtl.union<bar: i3, baz: i8>) {
+  %x = rtl.union_extract %a["bar"] : !rtl.union<foo: i1, bar: i3>
+  %z = rtl.union_create "bar", %x : !rtl.union<bar: i3, baz: i8>
+  rtl.output %x, %z : i3, !rtl.union<bar: i3, baz: i8>
+}

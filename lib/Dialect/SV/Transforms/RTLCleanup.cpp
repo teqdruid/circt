@@ -13,6 +13,9 @@
 
 #include "SVPassDetail.h"
 #include "circt/Dialect/SV/SVPasses.h"
+#include "circt/Support/ImplicitLocOpBuilder.h"
+
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace circt;
 
@@ -77,6 +80,7 @@ struct RTLCleanupPass : public sv::RTLCleanupBase<RTLCleanupPass> {
   void runOnRegionsInOp(Operation &op);
   void runOnGraphRegion(Region &region, bool shallow);
   void runOnProceduralRegion(Region &region, bool shallow);
+  void runOnEveryOp(Operation &op);
 
 private:
   /// Inline all regions from the second operation into the first and delete the
@@ -187,6 +191,9 @@ void RTLCleanupPass::runOnGraphRegion(Region &region, bool shallow) {
       alwaysCombOpSeen = alwaysComb;
       continue;
     }
+
+    // Run common clean ups.
+    runOnEveryOp(op);
   }
 
   // Reprocess the merged body because this may have uncovered other
@@ -244,6 +251,9 @@ void RTLCleanupPass::runOnProceduralRegion(Region &region, bool shallow) {
     // Keep track of the last side effecting operation we've seen.
     if (!mlir::MemoryEffectOpInterface::hasNoEffect(&op))
       lastSideEffectingOp = &op;
+
+    // Run common clean ups.
+    runOnEveryOp(op);
   }
 
   // Reprocess the merged body because this may have uncovered other
@@ -254,6 +264,30 @@ void RTLCleanupPass::runOnProceduralRegion(Region &region, bool shallow) {
   for (auto *op : opsToRevisitRegionsIn) {
     for (auto &region : op->getRegions())
       runOnProceduralRegion(region, /*shallow=*/true);
+  }
+}
+
+static mlir::Type padType(mlir::Type orig) {
+  return TypeSwitch<Type, Type>(orig);
+  int64_t uSize = rtl::getBitWidth(orig);
+
+  ArrayRef<rtl::UnionType::FieldInfo> fields = orig.getElements();
+  SmallVector<rtl::UnionType::FieldInfo, 8> paddedFields;
+
+  for (rtl::UnionType::FieldInfo field : fields) {
+    // If it's
+    if (auto uField = field.type.dyn_cast<rtl::UnionType>())
+      field.type = padType(uField);
+    int64_t
+  }
+}
+
+/// This method gets run on every operation regardless of whether it's in a
+/// procedural region or not.
+void RTLCleanupPass::runOnEveryOp(Operation &op) {
+  if (auto uCreateOp = dyn_cast<rtl::UnionCreateOp>(op)) {
+    rtl::UnionType ut = uCreateOp.getType();
+    ImplicitLocOpBuilder build(&op);
   }
 }
 
