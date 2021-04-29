@@ -81,6 +81,7 @@ private:
   std::shared_ptr<detail::TypeSchemaImpl> s;
   /// Cache of the decode/encode modules;
   mutable rtl::RTLModuleOp decImplMod;
+  mutable rtl::RTLModuleOp encImplMod;
 };
 
 } // namespace capnp
