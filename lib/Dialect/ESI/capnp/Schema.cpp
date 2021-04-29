@@ -105,7 +105,7 @@ public:
   /// Build an RTL/SV dialect capnp encoder for this type.
   Value buildEncoder(OpBuilder &, Value clk, Value valid, GasketComponent);
   /// Build an RTL/SV dialect capnp decoder for this type.
-  Value buildDecoder(OpBuilder &, Value clk, Value valid, Value);
+  rtl::RTLModuleOp buildDecoder(OpBuilder &, Value clk, Value valid, Value);
 
 private:
   ::capnp::ParsedSchema getSchema() const;
@@ -471,6 +471,7 @@ public:
   Slice padding(uint64_t p) const;
 
   Location loc() const { return *location; }
+  void setLoc(Location loc) { location = loc; }
   OpBuilder &b() const { return *builder; }
   MLIRContext *ctxt() const { return builder->getContext(); }
 
@@ -801,8 +802,8 @@ private:
   /// manage 'memory allocations' (figuring out where to place pointed to
   /// objects) separately from the data contained in those values, some of which
   /// are pointers themselves.
-  llvm::IntervalMap<uint64_t, GasketComponent, 16>::Allocator allocator;
-  llvm::IntervalMap<uint64_t, GasketComponent, 16> segmentValues;
+  llvm::IntervalMap<uint64_t, GasketComponent, 2048>::Allocator allocator;
+  llvm::IntervalMap<uint64_t, GasketComponent, 2048> segmentValues;
 
   /// Track the allocated message size. Increase to 'alloc' more.
   uint64_t messageSize;
@@ -1055,8 +1056,31 @@ static GasketComponent decodeField(Type type,
 
 /// Build an RTL/SV dialect capnp decoder for this type. Outputs packed and
 /// unpadded data.
-Value TypeSchemaImpl::buildDecoder(OpBuilder &b, Value clk, Value valid,
-                                   Value operandVal) {
+rtl::RTLModuleOp TypeSchemaImpl::buildDecoder(OpBuilder &b, Value clk,
+                                              Value valid, Value operandVal) {
+  auto loc = operandVal.getDefiningOp()->getLoc();
+  SmallString<64> modName;
+  modName.append("decode");
+  modName.append(name());
+  SmallVector<rtl::ModulePortInfo, 4> ports;
+  ports.push_back(rtl::ModulePortInfo{
+      b.getStringAttr("clk"), rtl::PortDirection::INPUT, clk.getType(), 0});
+  ports.push_back(rtl::ModulePortInfo{
+      b.getStringAttr("valid"), rtl::PortDirection::INPUT, valid.getType(), 1});
+  ports.push_back(rtl::ModulePortInfo{b.getStringAttr("encoded"),
+                                      rtl::PortDirection::INPUT,
+                                      operandVal.getType(), 2});
+  ports.push_back(rtl::ModulePortInfo{
+      b.getStringAttr("decoded"), rtl::PortDirection::OUTPUT, getType(), 0});
+  rtl::RTLModuleOp retMod = b.create<rtl::RTLModuleOp>(
+      operandVal.getLoc(), b.getStringAttr(modName), ports);
+
+  Block *innerBlock = retMod.getBodyBlock();
+  b.setInsertionPointToStart(innerBlock);
+  clk = innerBlock->getArgument(0);
+  valid = innerBlock->getArgument(1);
+  operandVal = innerBlock->getArgument(2);
+
   // Various useful integer types.
   auto i16 = b.getIntegerType(16);
 
@@ -1066,7 +1090,7 @@ Value TypeSchemaImpl::buildDecoder(OpBuilder &b, Value clk, Value valid,
          "Operand type and length must match the type's capnp size.");
 
   Slice operand(b, operandVal);
-  auto loc = operand.loc();
+  operand.setLoc(loc);
 
   auto alwaysAt = b.create<sv::AlwaysOp>(loc, sv::EventControl::AtPosEdge, clk);
   auto ifValid =
@@ -1116,7 +1140,7 @@ Value TypeSchemaImpl::buildDecoder(OpBuilder &b, Value clk, Value valid,
 
   // What to return depends on the type. (e.g. structs have to be constructed
   // from the field values.)
-  GasketComponent ret =
+  GasketComponent retGC =
       TypeSwitch<Type, GasketComponent>(type)
           .Case([&fieldValues](IntegerType) { return fieldValues[0]; })
           .Case([&fieldValues](rtl::ArrayType) { return fieldValues[0]; })
@@ -1126,7 +1150,11 @@ Value TypeSchemaImpl::buildDecoder(OpBuilder &b, Value clk, Value valid,
             return GasketComponent(
                 b, b.create<rtl::StructCreateOp>(loc, type, rawValues));
           });
-  return ret;
+
+  innerBlock->getTerminator()->erase();
+  b.setInsertionPointToEnd(innerBlock);
+  b.create<rtl::OutputOp>(loc, ValueRange{retGC.getValue()});
+  return retMod;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1167,5 +1195,23 @@ Value circt::esi::capnp::TypeSchema::buildEncoder(OpBuilder &builder, Value clk,
 Value circt::esi::capnp::TypeSchema::buildDecoder(OpBuilder &builder, Value clk,
                                                   Value valid,
                                                   Value operand) const {
-  return s->buildDecoder(builder, clk, valid, operand);
+  if (!decImplMod) {
+
+    auto topMod =
+        builder.getInsertionBlock()->getParentOp()->getParentOfType<ModuleOp>();
+    auto ip = builder.saveInsertionPoint();
+    builder.setInsertionPointToEnd(topMod.getBody());
+    decImplMod = s->buildDecoder(builder, clk, valid, operand);
+    builder.restoreInsertionPoint(ip);
+  }
+
+  SmallString<64> instName;
+  instName.append("decode");
+  instName.append(name());
+  instName.append("Inst");
+  auto resTypes = rtl::getModuleType(decImplMod).getResults();
+  auto decodeInst = builder.create<rtl::InstanceOp>(
+      operand.getLoc(), resTypes, instName, decImplMod.getName(),
+      ValueRange{clk, valid, operand}, DictionaryAttr());
+  return decodeInst.getResult(0);
 }
