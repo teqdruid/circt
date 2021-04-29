@@ -19,8 +19,7 @@ circuit MyModule :     ; CHECK: firrtl.circuit "MyModule" {
 
   ; CHECK: }
 
-  ; CHECK-LABEL: firrtl.extmodule @MyExtModule(!firrtl.uint {firrtl.name = "in"},
-  ; CHECK: !firrtl.flip<uint<8>> {firrtl.name = "out"})
+  ; CHECK-LABEL: firrtl.extmodule @MyExtModule(%in: !firrtl.uint, %out: !firrtl.flip<uint<8>>)
   ; CHECK: attributes {defname = "myextmodule"}
   ; CHECK-NOT: {
   extmodule MyExtModule :
@@ -28,7 +27,7 @@ circuit MyModule :     ; CHECK: firrtl.circuit "MyModule" {
     output ,,, out ,,: ,, UInt,<,8,>  ; Commas are whitespace
     defname = myextmodule
 
-  ; CHECK-LABEL: firrtl.extmodule @MyParameterizedExtModule(!firrtl.uint {firrtl.name = "in"}, !firrtl.flip<uint<8>> {firrtl.name = "out"})
+  ; CHECK-LABEL: firrtl.extmodule @MyParameterizedExtModule(%in: !firrtl.uint, %out: !firrtl.flip<uint<8>>)
   ; CHECK: attributes {defname = "name_thing",
   ; CHECK: parameters = {DEFAULT = 0 : i64,
   ; CHECK:               DEPTH = 3.242000e+01 : f64,
@@ -222,6 +221,36 @@ circuit MyModule :     ; CHECK: firrtl.circuit "MyModule" {
     ; CHECK: }
     ; CHECK-NOT: else
     when lt(reset, UInt(4)) :   ;; When with no else.
+      _t <= _t_2
+
+    ; CHECK: firrtl.when %reset  {
+    ; CHECK:   firrtl.connect %_t, %_t_2
+    ; CHECK: } else  {
+    ; CHECK:   [[COND:%.+]] = firrtl.not %reset
+    ; CHECK:   firrtl.when [[COND]]  {
+    ; CHECK:     firrtl.connect %_t, %_t_2
+    ; CHECK:   }
+    ; CHECK: }
+    when reset :
+      _t <= _t_2
+    else when not(reset) :
+      _t <= _t_2
+
+    ; CHECK: firrtl.when %reset  {
+    ; CHECK:   firrtl.connect %_t, %_t
+    ; CHECK: } else  {
+    ; CHECK:   [[COND:%.+]] = firrtl.not %reset
+    ; CHECK:   firrtl.when [[COND]]  {
+    ; CHECK:     firrtl.connect %_t, %_t_2
+    ; CHECK:   } else  {
+    ; CHECK:     firrtl.connect %_t, %_t_2
+    ; CHECK:   }
+    ; CHECK: }
+    when reset:
+      _t <= _t_2
+    else when not(reset) :
+      _t <= _t_2
+    else :
       _t <= _t_2
 
     ; CHECK: firrtl.printf %clock, %reset, "Something interesting!\0A %x %x"(%_t, %_t_2) : !firrtl.vector<uint<1>, 12>, !firrtl.vector<uint<1>, 12>

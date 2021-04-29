@@ -1826,9 +1826,9 @@ ParseResult FIRStmtParser::parseMemPort(MemDirAttr direction) {
   getAnnotations(getModuleTarget() + ">" + id, annotations);
   auto name = hasDontTouch(annotations) ? id : filterUselessName(id);
 
-  auto result = builder.create<MemoryPortOp>(
-      info.getLoc(), resultType, memory, indexExp, clock, direction,
-      builder.getStringAttr(name), annotations);
+  auto result =
+      builder.create<MemoryPortOp>(info.getLoc(), resultType, memory, indexExp,
+                                   clock, direction, name, annotations);
 
   // TODO(firrtl scala bug): If the next operation is a skip, just eat it if it
   // is at the same indent level as us.  This is a horrible hack on top of the
@@ -2111,10 +2111,14 @@ ParseResult FIRStmtParser::parseWhen(unsigned whenIndent) {
   whenStmt.createElseRegion();
 
   // If we have the ':' form, then handle it.
+
+  // Syntactic shorthand 'else when'. This uses the same indentation level as
+  // the outer 'when'.
   if (getToken().is(FIRToken::kw_when)) {
-    // TODO(completeness): Handle the 'else when' syntactic sugar when we
-    // care.
-    return emitError("'else when' syntax not supported yet"), failure();
+    // We create a sub parser for the else block.
+    FIRStmtParser subParser(whenStmt.getElseBodyBuilder(), *this,
+                            moduleContext);
+    return subParser.parseWhen(whenIndent);
   }
 
   // Parse the 'else' body into the 'else' region.
