@@ -2,7 +2,7 @@
 // RUN: circt-translate %s -export-esi-capnp -verify-diagnostics | FileCheck --check-prefix=CAPNP %s
 // RUN: circt-opt %s --lower-esi-ports --lower-esi-to-rtl -verify-diagnostics | circt-opt -verify-diagnostics | FileCheck --check-prefix=COSIM %s
 
-!DataPkt = type !rtl.struct<encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32 x i8>>
+!DataPkt = type !esi.struct<DataPkt, encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32 x i8>>
 !pktChan = type !esi.channel<!DataPkt>
 
 rtl.module.extern @Compressor(%in: !esi.channel<i1>) -> (%x: !pktChan)
