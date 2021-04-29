@@ -1,8 +1,8 @@
 # REQUIRES: bindings_python
 # RUN: %PYTHON% %s | FileCheck %s
 
-import circt
-from circt.dialects import rtl
+# import circt
+# from circt.dialects import rtl
 
 from mlir.ir import *
 from mlir.passmanager import PassManager
@@ -10,6 +10,10 @@ from mlir.passmanager import PassManager
 import sys
 
 with Context() as ctx, Location.unknown():
+
+  import circt
+  from circt.dialects import rtl
+
   circt.register_dialects(ctx)
 
   i32 = IntegerType.get_signless(32)

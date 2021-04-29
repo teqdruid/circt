@@ -54,6 +54,24 @@ static MlirType channelType(MlirType cElem) {
   return wrap(chanTy);
 }
 
+class PyChannelType : public mlir::python::PyConcreteType<PyChannelType> {
+public:
+  static constexpr IsAFunctionTy isaFunction = circtESITypeIsAChannelType;
+  static constexpr const char *pyClassName = "IndexType";
+  using PyConcreteType::PyConcreteType;
+
+  static void bindDerived(ClassTy &c) {
+    c.def_static(
+        "get",
+        [](mlir::python::DefaultingPyMlirContext context, MlirType inner) {
+          MlirType t = circtESIChannelTypeGet(context->get(), inner);
+          return PyChannelType(context->getRef(), t);
+        },
+        py::arg("context") = py::none(), py::arg("inner"),
+        "Create an ESI channel type.");
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // The main entry point into the ESI Assembly API.
 //===----------------------------------------------------------------------===//
@@ -100,8 +118,8 @@ void circt::python::populateDialectESISubmodule(py::module &m) {
         "Construct an ESI wrapper around RTL module 'op' given a list of "
         "latency-insensitive ports.",
         py::arg("op"), py::arg("name_list"));
-  m.def("channel_type", &channelType,
-        "Create an ESI channel type which wraps the argument type");
+
+  PyChannelType::bind(m);
 
   py::class_<System>(m, "CppSystem")
       .def(py::init<MlirModule>())

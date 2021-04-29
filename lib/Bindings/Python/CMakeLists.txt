@@ -23,6 +23,7 @@ add_mlir_python_extension(CIRCTBindingsPythonExtension _circt
     CIRCTCAPIRTL
     CIRCTCAPISV
     CIRCTCAPIExportVerilog
+    # MLIRCoreBindingsPythonExtension
 )
 target_include_directories(CIRCTBindingsPythonExtension PRIVATE "${MLIR_MAIN_SRC_DIR}/lib/Bindings/Python")
 add_dependencies(CIRCTBindingsPython CIRCTBindingsPythonExtension)

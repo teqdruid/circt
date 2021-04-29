@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_BINDINGS_PYTHON_CIRCTPYBINDUTILS_H
-#define CIRCT_BINDINGS_PYTHON_CIRCTPYBINDUTILS_H
+#ifndef CIRCT_BINDINGS_PYTHON_PYBINDUTILS_H
+#define CIRCT_BINDINGS_PYTHON_PYBINDUTILS_H
 
 #include <string>
 
@@ -218,4 +218,4 @@ inline pybind11::error_already_set raiseValueError(const std::string &message) {
 
 } // namespace pybind11
 
-#endif // CIRCT_BINDINGS_PYTHON_CIRCTPYBINDUTILS_H
+#endif // CIRCT_BINDINGS_PYTHON_PYBINDUTILS_H

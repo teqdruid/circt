@@ -20,6 +20,9 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(ESI, esi);
 MLIR_CAPI_EXPORTED void registerESIPasses();
 
+bool circtESITypeIsAChannelType(MlirType type);
+MlirType circtESIChannelTypeGet(MlirContext ctx, MlirType inner);
+
 #ifdef __cplusplus
 }
 #endif
