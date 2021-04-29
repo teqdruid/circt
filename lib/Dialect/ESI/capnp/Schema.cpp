@@ -103,7 +103,7 @@ public:
   bool operator==(const TypeSchemaImpl &) const;
 
   /// Build an RTL/SV dialect capnp encoder for this type.
-  Value buildEncoder(OpBuilder &, Value clk, Value valid, GasketComponent);
+  rtl::RTLModuleOp buildEncoder(OpBuilder &, Value clk, Value valid, Value);
   /// Build an RTL/SV dialect capnp decoder for this type.
   rtl::RTLModuleOp buildDecoder(OpBuilder &, Value clk, Value valid, Value);
 
@@ -917,11 +917,36 @@ CapnpSegmentBuilder::build(::capnp::schema::Node::Struct::Reader cStruct,
 
 /// Build an RTL/SV dialect capnp encoder for this type. Inputs need to be
 /// packed on unpadded.
-Value TypeSchemaImpl::buildEncoder(OpBuilder &b, Value clk, Value valid,
-                                   GasketComponent operand) {
+rtl::RTLModuleOp TypeSchemaImpl::buildEncoder(OpBuilder &b, Value clk,
+                                              Value valid, Value operandVal) {
+  auto loc = operandVal.getDefiningOp()->getLoc();
+  SmallString<64> modName;
+  modName.append("encode");
+  modName.append(name());
+  SmallVector<rtl::ModulePortInfo, 4> ports;
+  ports.push_back(rtl::ModulePortInfo{
+      b.getStringAttr("clk"), rtl::PortDirection::INPUT, clk.getType(), 0});
+  ports.push_back(rtl::ModulePortInfo{
+      b.getStringAttr("valid"), rtl::PortDirection::INPUT, valid.getType(), 1});
+  ports.push_back(rtl::ModulePortInfo{b.getStringAttr("decoded"),
+                                      rtl::PortDirection::INPUT,
+                                      operandVal.getType(), 2});
+  rtl::ArrayType modOutputType = rtl::ArrayType::get(b.getI1Type(), size());
+  ports.push_back(rtl::ModulePortInfo{b.getStringAttr("encoded"),
+                                      rtl::PortDirection::OUTPUT, modOutputType,
+                                      0});
+  rtl::RTLModuleOp retMod = b.create<rtl::RTLModuleOp>(
+      operandVal.getLoc(), b.getStringAttr(modName), ports);
+
+  Block *innerBlock = retMod.getBodyBlock();
+  b.setInsertionPointToStart(innerBlock);
+  clk = innerBlock->getArgument(0);
+  valid = innerBlock->getArgument(1);
+  GasketComponent operand(b, innerBlock->getArgument(2));
+  operand.setLoc(loc);
+
   ::capnp::schema::Node::Reader rootProto = getTypeSchema().getProto();
   auto st = rootProto.getStruct();
-  Location loc = operand.loc();
   CapnpSegmentBuilder seg(b, loc, size());
 
   // The values in the struct we are encoding.
@@ -935,7 +960,12 @@ Value TypeSchemaImpl::buildEncoder(OpBuilder &b, Value clk, Value valid,
   } else {
     fieldValues.push_back(GasketComponent(b, operand));
   }
-  return seg.build(st, fieldValues);
+  auto ret = seg.build(st, fieldValues);
+
+  innerBlock->getTerminator()->erase();
+  b.setInsertionPointToEnd(innerBlock);
+  b.create<rtl::OutputOp>(loc, ValueRange{ret});
+  return retMod;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1189,9 +1219,27 @@ bool circt::esi::capnp::TypeSchema::operator==(const TypeSchema &that) const {
 Value circt::esi::capnp::TypeSchema::buildEncoder(OpBuilder &builder, Value clk,
                                                   Value valid,
                                                   Value operand) const {
-  return s->buildEncoder(builder, clk, valid,
-                         GasketComponent(builder, operand));
+  if (!encImplMod) {
+
+    auto topMod =
+        builder.getInsertionBlock()->getParentOp()->getParentOfType<ModuleOp>();
+    auto ip = builder.saveInsertionPoint();
+    builder.setInsertionPointToEnd(topMod.getBody());
+    encImplMod = s->buildEncoder(builder, clk, valid, operand);
+    builder.restoreInsertionPoint(ip);
+  }
+
+  SmallString<64> instName;
+  instName.append("encode");
+  instName.append(name());
+  instName.append("Inst");
+  auto resTypes = rtl::getModuleType(encImplMod).getResults();
+  auto encodeInst = builder.create<rtl::InstanceOp>(
+      operand.getLoc(), resTypes, instName, encImplMod.getName(),
+      ValueRange{clk, valid, operand}, DictionaryAttr());
+  return encodeInst.getResult(0);
 }
+
 Value circt::esi::capnp::TypeSchema::buildDecoder(OpBuilder &builder, Value clk,
                                                   Value valid,
                                                   Value operand) const {
