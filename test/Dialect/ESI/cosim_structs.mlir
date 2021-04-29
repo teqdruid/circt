@@ -12,7 +12,7 @@ rtl.module @top(%clk:i1, %rstn:i1) -> () {
   %inputData = esi.cosim %clk, %rstn, %compressedData, 1 {name="Compressor"} : !pktChan -> !esi.channel<i1>
 }
 
-// CAPNP:      struct Struct{{.+}}
+// CAPNP:      struct DataPkt
 // CAPNP-NEXT:   encrypted        @0 :Bool;
 // CAPNP-NEXT:   compressionLevel @1 :UInt8;
 // CAPNP-NEXT:   blob             @2 :List(UInt8);
