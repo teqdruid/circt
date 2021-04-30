@@ -1593,6 +1593,7 @@ private:
   LogicalResult visitSV(InterfaceSignalOp op);
   LogicalResult visitSV(InterfaceModportOp op);
   LogicalResult visitSV(AssignInterfaceSignalOp op);
+  LogicalResult visitSV(TypeDefOp op);
   void emitStatementExpression(Operation *op);
 
   void emitBlockAsStatement(Block *block,
@@ -2298,6 +2299,16 @@ LogicalResult StmtEmitter::visitSV(AssignInterfaceSignalOp op) {
   return success();
 }
 
+// Syntax from: section 6.18 "User-defined types".
+LogicalResult StmtEmitter::visitSV(TypeDefOp op) {
+  indent() << "typedef ";
+  printPackedType(stripUnpackedTypes(op.type()), os, op.getLoc(), false);
+  printUnpackedTypePostfix(op.type(), os);
+  os << ' ' << op.sym_name();
+  os << ";\n";
+  return success();
+}
+
 void StmtEmitter::emitStatement(Operation *op) {
   // Know where the start of this statement is in case any out of band precuror
   // statements need to be emitted.
@@ -2838,7 +2849,7 @@ void UnifiedEmitter::emitMLIRModule() {
       ModuleEmitter(state).emitRTLGeneratedModule(rootOp);
     else if (isa<RTLGeneratorSchemaOp>(op)) { /* Empty */
     } else if (isa<InterfaceOp>(op) || isa<VerbatimOp>(op) ||
-               isa<IfDefProceduralOp>(op))
+               isa<IfDefProceduralOp>(op) || isa<TypeDefOp>(op))
       ModuleEmitter(state).emitStatement(&op);
     else {
       encounteredError = true;
@@ -2894,7 +2905,7 @@ void SplitEmitter::emitMLIRModule() {
         .Case<RTLModuleOp, InterfaceOp>([&](auto &) {
           moduleOps.push_back({&op, perFileOps.size(), {}});
         })
-        .Case<VerbatimOp, IfDefProceduralOp>(
+        .Case<VerbatimOp, IfDefProceduralOp, TypeDefOp>(
             [&](auto &) { perFileOps.push_back(&op); })
         .Case<RTLGeneratorSchemaOp, RTLModuleExternOp>([&](auto &) {})
         .Default([&](auto *) {
