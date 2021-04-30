@@ -79,9 +79,10 @@ private:
   /// The implementation of this. Separate to hide the details and avoid having
   /// to include the capnp headers in this header.
   std::shared_ptr<detail::TypeSchemaImpl> s;
+
   /// Cache of the decode/encode modules;
-  mutable rtl::RTLModuleOp decImplMod;
-  mutable rtl::RTLModuleOp encImplMod;
+  static llvm::SmallDenseMap<Type, rtl::RTLModuleOp> decImplMods;
+  static llvm::SmallDenseMap<Type, rtl::RTLModuleOp> encImplMods;
 };
 
 } // namespace capnp
