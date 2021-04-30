@@ -9,8 +9,8 @@ from _circt._esi import *
 import circt
 from circt.dialects.esi import *
 
+import typing
 import sys
-import os
 
 
 class System(CppSystem):
@@ -40,9 +40,9 @@ class System(CppSystem):
     pm.run(self.mod)
     self.passed = True
 
-  def print_verilog(self):
+  def print_verilog(self, out_stream: typing.TextIO = sys.stdout):
     self.run_passes()
-    circt.export_verilog(self.mod, sys.stdout)
+    circt.export_verilog(self.mod, out_stream)
 
   def cosim(self, name, id, clk, rstn, recv_type=None, send=None):
     if recv_type is None:
