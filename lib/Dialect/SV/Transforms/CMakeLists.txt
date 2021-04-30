@@ -5,6 +5,7 @@ add_circt_dialect_library(CIRCTSVTransforms
   RTLStubExternalModules.cpp
   RTLLegalizeNames.cpp
   RTLMemSimImpl.cpp
+  RTLDeclareTypedefs.cpp
 
   DEPENDS
   CIRCTSVTransformsIncGen
