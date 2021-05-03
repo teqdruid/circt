@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 
+#include "MLIRPybindAdaptors.h"
 #include "PybindUtils.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -98,6 +99,8 @@ private:
   MlirModule cModuleOp;
 };
 
+using namespace mlir::python::adaptors;
+
 void circt::python::populateDialectESISubmodule(py::module &m) {
   m.doc() = "ESI Python Native Extension";
   ::registerESIPasses();
@@ -115,4 +118,12 @@ void circt::python::populateDialectESISubmodule(py::module &m) {
       .def("lookup", &System::lookup, "Lookup an RTL module and return it.")
       .def("export_cosim_schema", &System::exportCapnpSchema,
            "Export the cosim RPC schema");
+
+  mlir_type_subclass(m, "ChannelType", circtESITypeIsAChannelType)
+      .def_static("get",
+                  [](MlirType inner) {
+                    return py::cast(circtESIChannelTypeGet(inner));
+                  })
+      .def_property_readonly(
+          "inner", [](MlirType self) { return circtESIChannelGetInner(self); });
 }
