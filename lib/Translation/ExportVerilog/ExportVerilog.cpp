@@ -110,6 +110,9 @@ static int getBitWidthOrSentinel(Type type) {
 /// Push this type's dimension into a vector.
 static void getTypeDims(SmallVectorImpl<int64_t> &dims, Type type,
                         Location loc) {
+  // Resolve any type aliases.
+  type = getCanonicalType(type);
+
   if (auto inout = type.dyn_cast<rtl::InOutType>())
     return getTypeDims(dims, inout.getElementType(), loc);
   if (auto uarray = type.dyn_cast<rtl::UnpackedArrayType>())
@@ -253,6 +256,10 @@ static bool printPackedTypeImpl(Type type, raw_ostream &os, Location loc,
         os << "<<unexpected unpacked array>>";
         emitError(loc, "Unexpected unpacked array in packed type ")
             << arrayType;
+        return true;
+      })
+      .Case<TypeAliasType>([&](TypeAliasType alias) {
+        os << alias.getName();
         return true;
       })
       .Default([&](Type type) {
@@ -1595,6 +1602,7 @@ private:
   LogicalResult visitSV(InterfaceSignalOp op);
   LogicalResult visitSV(InterfaceModportOp op);
   LogicalResult visitSV(AssignInterfaceSignalOp op);
+  LogicalResult visitSV(TypeDefOp op);
   void emitStatementExpression(Operation *op);
 
   void emitBlockAsStatement(Block *block,
@@ -2308,6 +2316,16 @@ LogicalResult StmtEmitter::visitSV(AssignInterfaceSignalOp op) {
   return success();
 }
 
+// Syntax from: section 6.18 "User-defined types".
+LogicalResult StmtEmitter::visitSV(TypeDefOp op) {
+  indent() << "typedef ";
+  printPackedType(stripUnpackedTypes(op.type()), os, op.getLoc(), false);
+  printUnpackedTypePostfix(op.type(), os);
+  os << ' ' << op.sym_name();
+  os << ";\n";
+  return success();
+}
+
 void StmtEmitter::emitStatement(Operation *op) {
   // Know where the start of this statement is in case any out of band precuror
   // statements need to be emitted.
@@ -2848,7 +2866,7 @@ void UnifiedEmitter::emitMLIRModule() {
       ModuleEmitter(state).emitRTLGeneratedModule(rootOp);
     else if (isa<RTLGeneratorSchemaOp>(op)) { /* Empty */
     } else if (isa<InterfaceOp>(op) || isa<VerbatimOp>(op) ||
-               isa<IfDefProceduralOp>(op))
+               isa<IfDefProceduralOp>(op) || isa<TypeDefOp>(op))
       ModuleEmitter(state).emitStatement(&op);
     else {
       encounteredError = true;
@@ -2904,7 +2922,7 @@ void SplitEmitter::emitMLIRModule() {
         .Case<RTLModuleOp, InterfaceOp>([&](auto &) {
           moduleOps.push_back({&op, perFileOps.size(), {}});
         })
-        .Case<VerbatimOp, IfDefProceduralOp>(
+        .Case<VerbatimOp, IfDefProceduralOp, TypeDefOp>(
             [&](auto &) { perFileOps.push_back(&op); })
         .Case<RTLGeneratorSchemaOp, RTLModuleExternOp>([&](auto &) {})
         .Default([&](auto *) {

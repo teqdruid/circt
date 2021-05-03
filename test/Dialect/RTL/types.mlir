@@ -37,4 +37,10 @@ module {
     %arg4: !rtl.inout<uarray<2xarray<42xi8>>>) {
     return
   }
+
+  // CHECK-LABEL: typeAlias
+  // CHECK-SAME: %arg0: !rtl.typealias<foo,i1>
+  func @typeAlias(%arg0: !rtl.typealias<foo,i1>) {
+    return
+  }
 }

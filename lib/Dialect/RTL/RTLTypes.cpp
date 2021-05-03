@@ -35,6 +35,9 @@ using namespace circt::rtl;
 /// Return true if the specified type is a value RTL Integer type.  This checks
 /// that it is a signless standard dialect type, that it isn't zero bits.
 bool circt::rtl::isRTLIntegerType(mlir::Type type) {
+  // Resolve any type aliases.
+  type = getCanonicalType(type);
+
   auto intType = type.dyn_cast<IntegerType>();
   if (!intType || !intType.isSignless())
     return false;
@@ -46,6 +49,9 @@ bool circt::rtl::isRTLIntegerType(mlir::Type type) {
 /// the set of types that can be composed together to represent synthesized,
 /// hardware but not marker types like InOutType.
 bool circt::rtl::isRTLValueType(Type type) {
+  // Resolve any type aliases.
+  type = getCanonicalType(type);
+
   // Signless and signed integer types are both valid.
   if (type.isa<IntegerType>())
     return true;
@@ -70,6 +76,9 @@ bool circt::rtl::isRTLValueType(Type type) {
 /// value of this type. Returns -1 if the type is not known or cannot be
 /// statically computed.
 int64_t circt::rtl::getBitWidth(mlir::Type type) {
+  // Resolve any type aliases.
+  type = getCanonicalType(type);
+
   return llvm::TypeSwitch<::mlir::Type, size_t>(type)
       .Case<IntegerType>(
           [](IntegerType t) { return t.getIntOrFloatBitWidth(); })
@@ -96,6 +105,9 @@ int64_t circt::rtl::getBitWidth(mlir::Type type) {
 /// InOutType.  Unlike isRTLValueType, this is not conservative, it only returns
 /// false on known InOut types, rather than any unknown types.
 bool circt::rtl::hasRTLInOutType(Type type) {
+  // Resolve any type aliases.
+  type = getCanonicalType(type);
+
   if (auto array = type.dyn_cast<ArrayType>())
     return hasRTLInOutType(array.getElementType());
 
@@ -107,6 +119,29 @@ bool circt::rtl::hasRTLInOutType(Type type) {
                        [](const auto &f) { return hasRTLInOutType(f.type); });
   }
   return type.isa<InOutType>();
+}
+
+/// Return the canonical type, that is, the type with all type aliases
+/// recursively resolved to a base type.
+Type circt::rtl::getCanonicalType(Type type) {
+  return llvm::TypeSwitch<Type, Type>(type)
+      .Case([](TypeAliasType t) { return getCanonicalType(t.getInner()); })
+      .Case([](ArrayType t) {
+        return ArrayType::get(getCanonicalType(t.getElementType()),
+                              t.getSize());
+      })
+      .Case([](UnpackedArrayType t) {
+        return UnpackedArrayType::get(getCanonicalType(t.getElementType()),
+                                      t.getSize());
+      })
+      .Case([](StructType t) {
+        SmallVector<StructType::FieldInfo> fieldInfo;
+        for (auto field : t.getElements())
+          fieldInfo.push_back(
+              StructType::FieldInfo{field.name, getCanonicalType(field.type)});
+        return StructType::get(t.getContext(), fieldInfo);
+      })
+      .Default([](Type t) { return t; });
 }
 
 /// Parse and print nested RTL types nicely.  These helper methods allow eliding
@@ -293,6 +328,23 @@ LogicalResult InOutType::verify(function_ref<InFlightDiagnostic()> emitError,
   if (!isRTLValueType(innerType))
     return emitError() << "invalid element for rtl.inout type " << innerType;
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TypeAliasType
+//===----------------------------------------------------------------------===//
+
+Type TypeAliasType::parse(MLIRContext *ctxt, DialectAsmParser &p) {
+  StringRef name;
+  Type inner;
+  if (p.parseLess() || p.parseKeyword(&name) || p.parseComma() ||
+      parseRTLElementType(inner, p) || p.parseGreater())
+    return Type();
+  return get(ctxt, name, inner);
+}
+
+void TypeAliasType::print(DialectAsmPrinter &p) const {
+  p << getMnemonic() << "<" << getName() << "," << getInner() << ">";
 }
 
 /// Parses a type registered to this dialect. Parse out the mnemonic then invoke
