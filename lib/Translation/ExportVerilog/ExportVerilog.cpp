@@ -482,9 +482,9 @@ public:
   /// aggregate it together and print a pretty comment specifying where the
   /// operations came from.  In any case, print a newline.
   void emitLocationInfoAndNewLine(const SmallPtrSet<Operation *, 8> &ops) {
-    // auto locInfo = getLocationInfoAsString(ops);
-    // if (!locInfo.empty())
-    //   os << "\t// " << locInfo;
+    auto locInfo = getLocationInfoAsString(ops);
+    if (!locInfo.empty())
+      os << "\t// " << locInfo;
     os << '\n';
   }
 
