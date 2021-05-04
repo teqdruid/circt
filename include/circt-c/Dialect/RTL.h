@@ -19,6 +19,7 @@
 
 #include "mlir-c/IR.h"
 #include "mlir-c/Registration.h"
+#include "mlir/CAPI/IR.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,7 +90,7 @@ MLIR_CAPI_EXPORTED MlirType
 rtlStructTypeGet(MlirContext ctx, intptr_t numElements,
                  struct RTLStructFieldInfo const *elements);
 /// Creates an RTL type alias type in the context associated with inner.
-MLIR_CAPI_EXPORTED MlirType rtlTypeAliasTypeGet(MlirStringRef name,
+MLIR_CAPI_EXPORTED MlirType rtlTypeAliasTypeGet(MlirIdentifier name,
                                                 MlirType inner);
 
 #ifdef __cplusplus
