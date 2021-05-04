@@ -7,6 +7,7 @@ import mlir.ir
 
 from _circt._esi import *
 import circt
+from circt.dialects import rtl
 from circt.dialects.esi import *
 
 import typing
@@ -23,8 +24,31 @@ class System(CppSystem):
   passed = False
 
   def __init__(self):
-    self.mod = mlir.ir.Module.create()
-    super().__init__(self.mod)
+    self.ctxt = mlir.ir.Context()
+    with self.ctxt, mlir.ir.Location.unknown():
+      circt.register_dialects(self.ctxt)
+      self.mod = mlir.ir.Module.create()
+      super().__init__(self.mod)
+      self.get_types()
+
+      with mlir.ir.InsertionPoint(self.body):
+        self.declare_externs()
+        rtl.RTLModuleOp(
+            name='top',
+            input_ports=[('clk', self.i1), ('rstn', self.i1)],
+            output_ports=[],
+            body_builder=self.build_top)
+
+  def declare_externs(self):
+    pass
+
+  def build_top(self, topMod):
+    self.build(topMod)
+    rtl.OutputOp([])
+
+  def get_types(self):
+    self.i1 = mlir.ir.IntegerType.get_signless(1)
+    self.byte = mlir.ir.IntegerType.get_signless(8)
 
   @property
   def body(self):
@@ -36,9 +60,10 @@ class System(CppSystem):
   def run_passes(self):
     if self.passed:
       return
-    pm = PassManager.parse(",".join(self.passes))
-    pm.run(self.mod)
-    self.passed = True
+    with self.ctxt:
+      pm = PassManager.parse(",".join(self.passes))
+      pm.run(self.mod)
+      self.passed = True
 
   def print_verilog(self, out_stream: typing.TextIO = sys.stdout):
     self.run_passes()
