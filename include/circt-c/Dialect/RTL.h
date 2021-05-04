@@ -19,7 +19,6 @@
 
 #include "mlir-c/IR.h"
 #include "mlir-c/Registration.h"
-#include "mlir/CAPI/IR.h"
 
 #ifdef __cplusplus
 extern "C" {
