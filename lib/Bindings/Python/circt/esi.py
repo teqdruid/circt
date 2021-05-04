@@ -18,7 +18,7 @@ class System(CppSystem):
   mod = None
   passes = [
       "lower-esi-ports", "lower-esi-to-physical", "lower-esi-to-rtl",
-      "rtl-legalize-names", "rtl.module(rtl-cleanup)"
+      "rtl-declare-typedefs", "rtl-legalize-names", "rtl.module(rtl-cleanup)"
   ]
   passed = False
 
@@ -47,9 +47,9 @@ class System(CppSystem):
   def cosim(self, name, id, clk, rstn, recv_type=None, send=None):
     if recv_type is None:
       recv_type = mlir.ir.IntegerType.get_signless(1)
-    recv_type = channel_of(recv_type)
+    recv_type = ChannelType.get(recv_type)
     if send is None:
-      send = NullSourceOp(channel_of(mlir.ir.IntegerType.get_signless(1))).out
+      send = NullSourceOp(ChannelType.get(mlir.ir.IntegerType.get_signless(1))).out
     ep = CosimEndpoint(recv_type, clk, rstn, send, mlir.ir.Attribute.parse(str(id)))
     ep.operation.attributes["name"] = mlir.ir.StringAttr.get(name)
     return ep
