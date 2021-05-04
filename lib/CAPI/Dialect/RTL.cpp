@@ -14,6 +14,7 @@
 #include "circt/Dialect/RTL/RTLOps.h"
 #include "circt/Dialect/RTL/RTLTypes.h"
 #include "circt/Support/LLVM.h"
+#include "mlir-c/IR.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/CAPI/Support.h"
@@ -77,4 +78,13 @@ MlirType rtlStructTypeGet(MlirContext ctx, intptr_t numElements,
         StructType::FieldInfo{unwrap(elements[i].name), typeAttr.getValue()});
   }
   return wrap(StructType::get(unwrap(ctx), fieldInfos));
+}
+
+bool rtlTypeIsATypeAlias(MlirType type) {
+  return unwrap(type).isa<TypeAliasType>();
+}
+
+MlirType rtlTypeAliasTypeGet(MlirStringRef name, MlirType inner) {
+  return wrap(TypeAliasType::get(unwrap(mlirTypeGetContext(inner)),
+                                 unwrap(name), unwrap(inner)));
 }
