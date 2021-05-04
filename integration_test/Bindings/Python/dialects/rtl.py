@@ -28,6 +28,13 @@ with Context() as ctx, Location.unknown():
   struct = rtl.StructType.get([("foo", i32), ("bar", array_i32)])
   print(struct)
 
+  # CHECK: !rtl.typealias<foo,i32>
+  # CHECK: !rtl.typealias<bar,i32>
+  alias1 = rtl.TypeAliasType.get("foo", i32)
+  print(alias1)
+  alias2 = rtl.TypeAliasType.get("bar", i32)
+  print(alias2)
+
   m = Module.create()
   with InsertionPoint(m.body):
     # CHECK: rtl.module @MyWidget(%my_input: i32) -> (%my_output: i32)
