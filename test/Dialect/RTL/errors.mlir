@@ -100,7 +100,7 @@ rtl.module @struct(%a: !rtl.struct<foo: i42>) {
 // -----
 
 rtl.module @struct(%a: !rtl.struct<foo: i42>) {
-  // expected-error @+1 {{custom op 'rtl.struct_extract' expected canonical type to be StructType}}
+  // expected-error @+1 {{custom op 'rtl.struct_extract' expected canonical type to be either Struct or Union type}}
   %aget = rtl.struct_extract %a["foo"] : i42
 }
 

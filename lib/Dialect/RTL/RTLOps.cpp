@@ -1026,10 +1026,11 @@ static ParseResult parseExtractOp(OpAsmParser &parser, OperationState &result) {
       parser.parseColonType(declType))
     return failure();
 
-  auto structType = getCanonicalType(declType).dyn_cast<StructType>();
+  auto structType = getCanonicalType(declType).dyn_cast<AggregateType>();
   if (!structType)
-    return parser.emitError(parser.getNameLoc(),
-                            "expected canonical type to be StructType");
+    return parser.emitError(
+        parser.getNameLoc(),
+        "expected canonical type to be either Struct or Union type");
   Type resultType = structType.getFieldType(fieldName.getValue());
   if (!resultType) {
     parser.emitError(parser.getNameLoc(), "invalid field name specified");

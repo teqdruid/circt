@@ -17,6 +17,6 @@ rtl.module @top(%clk:i1, %rstn:i1) -> () {
 // CAPNP-NEXT:   compressionLevel @1 :UInt8;
 // CAPNP-NEXT:   blob             @2 :List(UInt8);
 
-// COSIM: rtl.instance "encodeStruct{{.+}}Inst" @encodeStruct{{.+}}(%clk, %6, %7) : (i1, i1, !rtl.struct<encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32xi8>>) -> !rtl.array<448xi1>
+// COSIM: rtl.instance "encodeDataPktInst" @encodeDataPkt(%clk, %{{.+}}, %{{.+}}) : (i1, i1, !rtl.typealias<DataPkt,!rtl.struct<encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32xi8>>>) -> !rtl.array<448xi1>
 // COSIM: rtl.instance "Compressor" @Cosim_Endpoint(%clk, %rstn, %{{.+}}, %{{.+}}, %{{.+}}) {parameters = {ENDPOINT_ID = 1 : i32, RECV_TYPE_ID = {{[0-9]+}} : ui64, RECV_TYPE_SIZE_BITS = 128 : i32, SEND_TYPE_ID = {{[0-9]+}} : ui64, SEND_TYPE_SIZE_BITS = 448 : i32}}
-// COSIM: rtl.module @encode{{.+}}(%clk: i1, %valid: i1, %unencodedInput: !rtl.struct<encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32xi8>>) -> (%encoded: !rtl.array<448xi1>)
+// COSIM: rtl.module @encodeDataPkt(%clk: i1, %valid: i1, %unencodedInput: !rtl.typealias<DataPkt,!rtl.struct<encrypted: i1, compressionLevel: ui4, blob: !rtl.array<32xi8>>>) -> (%encoded: !rtl.array<448xi1>)
