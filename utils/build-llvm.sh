@@ -14,7 +14,7 @@
 
 BUILD_DIR=${1:-"build"}
 INSTALL_DIR=${2:-"install"}
-BUILD_TYPE=${3:-"Release"}
+BUILD_TYPE=${3:-"Debug"}
 EXTRA_ARGS=${@:4}
 
 mkdir -p llvm/$BUILD_DIR
