@@ -54,10 +54,6 @@ def PassiveType : DialectType<FIRRTLDialect,
   CPred<"$_self.isa<FIRRTLType>() && $_self.cast<FIRRTLType>().isPassive()">,
   "a passive type (contain no flips)", "::circt::firrtl::FIRRTLType">;
 
-def UnflippedType : DialectType<FIRRTLDialect,
-  CPred<"$_self.isa<FIRRTLType>() && !$_self.isa<FlipType>()">,
-  "a type that does not contain an outer flip", "::circt::firrtl::FIRRTLType">;
-
 //===----------------------------------------------------------------------===//
 // FIRRTL Types Predicates
 //===----------------------------------------------------------------------===//
@@ -111,6 +107,9 @@ def MemDirAttr: I32EnumAttr<"MemDirAttr", "Memory Direction Enum",
 
 def AnnotationArrayAttr : TypedArrayAttrBase<DictionaryAttr,
                                              "An array of FIRRTL Annotations">;
+
+def PortAnnotationsAttr : TypedArrayAttrBase<AnnotationArrayAttr,
+                                             "FIRRTL port annotations">;
 
 def InvalidValueAttr
   : AttrDef<FIRRTLDialect, "InvalidValue", [], "::mlir::Attribute"> {

@@ -162,7 +162,7 @@ protected:
 template <class DerivedT, Expr::Kind DerivedKind>
 struct UnaryExprBase : public UnaryExpr {
   template <typename... Args>
-  UnaryExprBase(Args &&...args)
+  UnaryExprBase(Args &&... args)
       : UnaryExpr(DerivedKind, std::forward<Args>(args)...) {}
   static bool classof(const Expr *e) { return e->kind == DerivedKind; }
 };
@@ -201,7 +201,7 @@ protected:
 template <class DerivedT, Expr::Kind DerivedKind>
 struct BinaryExprBase : public BinaryExpr {
   template <typename... Args>
-  BinaryExprBase(Args &&...args)
+  BinaryExprBase(Args &&... args)
       : BinaryExpr(DerivedKind, std::forward<Args>(args)...) {}
   static bool classof(const Expr *e) { return e->kind == DerivedKind; }
 };
@@ -296,7 +296,7 @@ public:
   /// existing one. `R` is the type of the object to be allocated. `R` must be
   /// derived from or be the type `T`.
   template <typename R = T, typename... Args>
-  std::pair<R *, bool> alloc(Args &&...args) {
+  std::pair<R *, bool> alloc(Args &&... args) {
     auto stack_value = R(std::forward<Args>(args)...);
     auto stack_slot = Slot(&stack_value);
     auto it = interned.find(stack_slot);
@@ -320,7 +320,7 @@ public:
   /// Allocate a new object. `R` is the type of the object to be allocated. `R`
   /// must be derived from or be the type `T`.
   template <typename R = T, typename... Args>
-  R *alloc(Args &&...args) {
+  R *alloc(Args &&... args) {
     return new (allocator) R(std::forward<Args>(args)...);
   }
 };
@@ -381,7 +381,7 @@ private:
 
   /// Add an allocated expression to the list above.
   template <typename R, typename T, typename... Args>
-  R *alloc(InternedAllocator<T> &allocator, Args &&...args) {
+  R *alloc(InternedAllocator<T> &allocator, Args &&... args) {
     auto it = allocator.template alloc<R>(std::forward<Args>(args)...);
     if (it.second)
       exprs.push_back(it.first);
@@ -743,7 +743,7 @@ computeUnary(ExprSolution arg, llvm::function_ref<int32_t(int32_t)> operation) {
   if (arg.first)
     arg.first = operation(*arg.first);
   return arg;
-};
+}
 
 static ExprSolution
 computeBinary(ExprSolution lhs, ExprSolution rhs,
@@ -756,7 +756,7 @@ computeBinary(ExprSolution lhs, ExprSolution rhs,
   else if (rhs.first)
     result.first = rhs.first;
   return result;
-};
+}
 
 /// Compute the value of a constraint expression`expr`. `seenVars` is used as a
 /// recursion breaker. Recursive variables are treated as zero. Returns the
@@ -1149,19 +1149,13 @@ LogicalResult InferenceMapping::mapOperation(Operation *op) {
 
       // Aggregate Values
       .Case<SubfieldOp>([&](auto op) {
-        auto type = op.input().getType();
-        if (auto flipType = type.template dyn_cast<FlipType>())
-          type = flipType.getElementType();
-        auto bundleType = type.template cast<BundleType>();
+        auto bundleType = op.input().getType().template cast<BundleType>();
         auto index = bundleType.getElementIndex(op.fieldname()).getValue();
         auto fieldID = bundleType.getFieldID(index);
         unifyTypes(FieldRef(op.getResult(), 0), FieldRef(op.input(), fieldID),
                    op.getType());
       })
       .Case<SubindexOp, SubaccessOp>([&](auto op) {
-        auto type = op.input().getType();
-        if (auto flipType = type.template dyn_cast<FlipType>())
-          type = flipType.getElementType();
         // All vec fields unify to the same thing. Always use the first element
         // of the vector, which has a field ID of 1.
         unifyTypes(FieldRef(op.getResult(), 0), FieldRef(op.input(), 1),
@@ -1405,21 +1399,26 @@ void InferenceMapping::declareVars(Value value, Location loc) {
     if (width >= 0) {
       // Known width integer create a known expression.
       setExpr(FieldRef(value, fieldID), solver.known(width));
+      fieldID++;
     } else if (width == -1) {
       // Unkown width integers create a variable.
       setExpr(FieldRef(value, fieldID), solver.var());
-    } else if (auto inner = type.dyn_cast<FlipType>()) {
-      // Flip types declare unknown widths in their element type.
-      return declare(inner.getElementType());
+      fieldID++;
     } else if (auto bundleType = type.dyn_cast<BundleType>()) {
       // Bundle types recursively declare all bundle elements.
+      fieldID++;
       for (auto &element : bundleType.getElements()) {
-        fieldID++;
         declare(element.type);
       }
     } else if (auto vecType = type.dyn_cast<FVectorType>()) {
       fieldID++;
-      declare(vecType.getElementType());
+      auto save = fieldID;
+      // Skip 0 length vectors.
+      if (vecType.getNumElements() > 0) {
+        declare(vecType.getElementType());
+      }
+      // Skip past the rest of the elements
+      fieldID = save + vecType.getMaxFieldID();
     } else {
       llvm_unreachable("Unknown type inside a bundle!");
     }
@@ -1435,25 +1434,31 @@ void InferenceMapping::declareVars(Value value, Location loc) {
 /// This function is used to apply regular connects.
 void InferenceMapping::constrainTypes(Value larger, Value smaller) {
   // Recurse to every leaf element and set larger >= smaller.
-  auto type = larger.getType().cast<FIRRTLType>().stripFlip().first;
+  auto type = larger.getType().cast<FIRRTLType>();
   auto fieldID = 0;
   std::function<void(FIRRTLType, Value, Value)> constrain =
       [&](FIRRTLType type, Value larger, Value smaller) {
-        if (auto flipType = type.dyn_cast<FlipType>()) {
-          // Flip the LHS and RHS.
-          constrain(flipType.getElementType(), smaller, larger);
-        } else if (auto bundleType = type.dyn_cast<BundleType>()) {
+        if (auto bundleType = type.dyn_cast<BundleType>()) {
+          fieldID++;
           for (auto &element : bundleType.getElements()) {
-            fieldID++;
-            constrain(element.type, larger, smaller);
+            if (element.isFlip)
+              constrain(element.type, smaller, larger);
+            else
+              constrain(element.type, larger, smaller);
           }
         } else if (auto vecType = type.dyn_cast<FVectorType>()) {
           fieldID++;
-          constrain(vecType.getElementType(), larger, smaller);
+          auto save = fieldID;
+          // Skip 0 length vectors.
+          if (vecType.getNumElements() > 0) {
+            constrain(vecType.getElementType(), larger, smaller);
+          }
+          fieldID = save + vecType.getMaxFieldID();
         } else if (type.isGround()) {
           // Leaf element, look up their expressions, and create the constraint.
           constrainTypes(getExpr(FieldRef(larger, fieldID)),
                          getExpr(FieldRef(smaller, fieldID)));
+          fieldID++;
         } else {
           llvm_unreachable("Unknown type inside a bundle!");
         }
@@ -1473,12 +1478,7 @@ void InferenceMapping::partiallyConstrainTypes(Value larger, Value smaller) {
   std::function<void(FIRRTLType, Value, unsigned, FIRRTLType, Value, unsigned)>
       constrain = [&](FIRRTLType aType, Value a, unsigned aID, FIRRTLType bType,
                       Value b, unsigned bID) {
-        if (auto aFlipType = aType.dyn_cast<FlipType>()) {
-          auto bFlipType = bType.cast<FlipType>();
-          // Flip the LHS and RHS.
-          constrain(bFlipType.getElementType(), b, bID,
-                    aFlipType.getElementType(), a, aID);
-        } else if (auto aBundle = aType.dyn_cast<BundleType>()) {
+        if (auto aBundle = aType.dyn_cast<BundleType>()) {
           auto bBundle = bType.cast<BundleType>();
           for (unsigned aIndex = 0, e = aBundle.getNumElements(); aIndex < e;
                ++aIndex) {
@@ -1488,10 +1488,17 @@ void InferenceMapping::partiallyConstrainTypes(Value larger, Value smaller) {
               continue;
             auto &aElt = aBundle.getElements()[aIndex];
             auto &bElt = bBundle.getElements()[*bIndex];
-            constrain(aElt.type, a, aID + aBundle.getFieldID(aIndex), bElt.type,
-                      b, bID + bBundle.getFieldID(*bIndex));
+            if (aElt.isFlip)
+              constrain(aElt.type, b, bID + bBundle.getFieldID(*bIndex),
+                        aElt.type, a, aID + aBundle.getFieldID(aIndex));
+            else
+              constrain(aElt.type, a, aID + aBundle.getFieldID(aIndex),
+                        bElt.type, b, bID + bBundle.getFieldID(*bIndex));
           }
         } else if (auto aVecType = aType.dyn_cast<FVectorType>()) {
+          // Do not constrain the elements of a zero length vector.
+          if (aVecType.getNumElements() == 0)
+            return;
           auto bVecType = bType.cast<FVectorType>();
           constrain(aVecType.getElementType(), a, aID + 1,
                     bVecType.getElementType(), b, bID + 1);
@@ -1503,8 +1510,8 @@ void InferenceMapping::partiallyConstrainTypes(Value larger, Value smaller) {
         }
       };
 
-  auto largerType = larger.getType().cast<FIRRTLType>().stripFlip().first;
-  auto smallerType = smaller.getType().cast<FIRRTLType>().stripFlip().first;
+  auto largerType = larger.getType().cast<FIRRTLType>();
+  auto smallerType = smaller.getType().cast<FIRRTLType>();
   constrain(largerType, larger, 0, smallerType, smaller, 0);
 }
 
@@ -1532,31 +1539,31 @@ void InferenceMapping::unifyTypes(FieldRef lhs, FieldRef rhs, FIRRTLType type) {
   if (lhs == rhs)
     return;
 
-  // Strip an outer flip off the type if there is one.  We don't want to
-  // interpret an outerflip the same way as a flip in a bundle.
-  type = type.stripFlip().first;
-
   // Co-iterate the two field refs, recurring into every leaf element and set
   // them equal.
   auto fieldID = 0;
   std::function<void(FIRRTLType)> unify = [&](FIRRTLType type) {
-    if (auto inner = type.dyn_cast<FlipType>()) {
-      return unify(inner.getElementType());
-    } else if (auto bundleType = type.dyn_cast<BundleType>()) {
-      for (auto &element : bundleType.getElements()) {
-        fieldID++;
-        unify(element.type);
-      }
-    } else if (auto vecType = type.dyn_cast<FVectorType>()) {
-      fieldID++;
-      unify(vecType.getElementType());
-    } else if (type.isGround()) {
+    if (type.isGround()) {
       // Leaf element, unify the fields!
       FieldRef lhsFieldRef(lhs.getValue(), lhs.getFieldID() + fieldID);
       FieldRef rhsFieldRef(rhs.getValue(), rhs.getFieldID() + fieldID);
       LLVM_DEBUG(llvm::dbgs() << "Unify " << getFieldName(lhsFieldRef) << " = "
                               << getFieldName(rhsFieldRef) << "\n");
       setExpr(lhsFieldRef, getExpr(rhsFieldRef));
+      fieldID++;
+    } else if (auto bundleType = type.dyn_cast<BundleType>()) {
+      fieldID++;
+      for (auto &element : bundleType.getElements()) {
+        unify(element.type);
+      }
+    } else if (auto vecType = type.dyn_cast<FVectorType>()) {
+      fieldID++;
+      auto save = fieldID;
+      // Skip 0 length vectors.
+      if (vecType.getNumElements() > 0) {
+        unify(vecType.getElementType());
+      }
+      fieldID = save + vecType.getMaxFieldID();
     } else {
       llvm_unreachable("Unknown type inside a bundle!");
     }
@@ -1664,12 +1671,13 @@ bool InferenceTypeUpdate::updateOperation(Operation *op) {
     auto rhs = con.src().getType().cast<FIRRTLType>();
     auto lhsWidth = lhs.getBitWidthOrSentinel();
     auto rhsWidth = rhs.getBitWidthOrSentinel();
-    if (lhsWidth > 0 && rhsWidth > 0 && lhsWidth < rhsWidth) {
+    if (lhsWidth >= 0 && rhsWidth >= 0 && lhsWidth < rhsWidth) {
       OpBuilder builder(op);
-      auto trunc = builder.createOrFold<BitsPrimOp>(con.getLoc(), con.src(),
-                                                    lhsWidth - 1, 0);
+      auto trunc = builder.createOrFold<TailPrimOp>(con.getLoc(), con.src(),
+                                                    rhsWidth - lhsWidth);
       if (rhs.isa<SIntType>())
         trunc = builder.createOrFold<AsSIntPrimOp>(con.getLoc(), lhs, trunc);
+
       LLVM_DEBUG(llvm::dbgs()
                  << "Truncating RHS to " << lhs << " in " << con << "\n");
       con->replaceUsesOfWith(con.src(), trunc);
@@ -1762,27 +1770,35 @@ bool InferenceTypeUpdate::updateValue(Value value) {
     auto width = type.getBitWidthOrSentinel();
     if (width >= 0) {
       // Known width integers return themselves.
+      fieldID++;
       return type;
     } else if (width == -1) {
       // Unkown width integers return the solved type.
       auto newType = updateType(FieldRef(value, fieldID), type);
-      assert(newType && "Type was not inferred.");
+      fieldID++;
       return newType;
-    } else if (auto flipType = type.dyn_cast<FlipType>()) {
-      // Flip types update unknown widths in their element type.
-      return FlipType::get(update(flipType.getElementType()));
     } else if (auto bundleType = type.dyn_cast<BundleType>()) {
       // Bundle types recursively update all bundle elements.
+      fieldID++;
       llvm::SmallVector<BundleType::BundleElement, 3> elements;
       for (auto &element : bundleType.getElements()) {
-        fieldID++;
-        elements.emplace_back(element.name, update(element.type));
+        elements.emplace_back(element.name, element.isFlip,
+                              update(element.type));
       }
       return BundleType::get(elements, context);
     } else if (auto vecType = type.dyn_cast<FVectorType>()) {
       fieldID++;
-      return FVectorType::get(update(vecType.getElementType()),
-                              vecType.getNumElements());
+      auto save = fieldID;
+      // TODO: this should recurse into the element type of 0 length vectors and
+      // set any unknown width to 0.
+      if (vecType.getNumElements() > 0) {
+        auto newType = FVectorType::get(update(vecType.getElementType()),
+                                        vecType.getNumElements());
+        fieldID = save + vecType.getMaxFieldID();
+        return newType;
+      }
+      // If this is a 0 length vector return the original type.
+      return type;
     }
     llvm_unreachable("Unknown type inside a bundle!");
   };

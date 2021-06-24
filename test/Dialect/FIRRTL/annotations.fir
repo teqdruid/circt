@@ -82,6 +82,21 @@ circuit Foo: %[[{"a":"a","target":"~Foo|Foo>bar"},{"b":"b","target":"Foo.Foo.bar
 
 ; // -----
 
+; COM: Test result annotations of InstanceOp.
+circuit Foo: %[[{"one":null,"target":"~Foo|Foo>bar.a"},
+                {"two":null,"target":"~Foo|Foo>bar.b.baz"}]]
+  module Bar:
+    input a: UInt<1>
+    output b: {baz: UInt<1>, qux: UInt<1>}
+  module Foo:
+    inst bar of Bar
+
+    ; CHECK-LABEL: module {
+    ; CHECK: %bar_a, %bar_b = firrtl.instance @Bar
+    ; CHECK-SAME: [{one}], [{target = [".baz"], two}]
+
+; // -----
+
 ; COM: A ReferenceTarget/ComponentName pointing at a CMem should work.
 circuit Foo: %[[{"a":"a","target":"~Foo|Foo>bar"},{"b":"b","target":"Foo.Foo.bar"}]]
   module Foo:
@@ -515,3 +530,66 @@ circuit GCTInterface : %[
     ; CHECK-SAME: {class = "sifive.enterprise.grandcentral.AugmentedGroundType", defName = "register", name = "_2", target = ["._2", "[1]"]}
     ; CHECK-SAME: {class = "sifive.enterprise.grandcentral.AugmentedGroundType", defName = "_0", name = "_1", target = ["._0", "._1"]}
     ; CHECK-SAME: {class = "sifive.enterprise.grandcentral.AugmentedGroundType", defName = "_0", name = "_0", target = ["._0", "._0"]}]}
+
+; // -----
+
+; Test weird Grand Central AugmentedTypes which do not have a mapping in the
+; Verilog.  This test is primarily making sure that these don't error.
+
+circuit Foo : %[[
+{
+  "class": "sifive.enterprise.grandcentral.GrandCentralView$SerializedViewAnnotation",
+  "name": "Bar",
+  "companion": "~Foo|Bar_companion",
+  "parent": "~Foo|Foo",
+  "view": {
+    "class": "sifive.enterprise.grandcentral.AugmentedBundleType",
+    "defName": "View",
+    "elements": [
+      {
+        "name": "string",
+        "description": "a string",
+        "tpe": {
+          "class": "sifive.enterprise.grandcentral.AugmentedStringType",
+          "value": "hello"
+        }
+      },
+      {
+        "name": "boolean",
+        "description": "a boolean",
+        "tpe": {
+          "class": "sifive.enterprise.grandcentral.AugmentedBooleanType",
+          "value": false
+        }
+      },
+      {
+        "name": "integer",
+        "description": "an integer",
+        "tpe": {
+          "class": "sifive.enterprise.grandcentral.AugmentedIntegerType",
+          "value": 42
+        }
+      },
+      {
+        "name": "double",
+        "description": "a double",
+        "tpe": {
+          "class": "sifive.enterprise.grandcentral.AugmentedDoubleType",
+          "value": 3.14
+        }
+      }
+    ]
+  }
+}
+]]
+  extmodule Bar_companion :
+
+  module Foo :
+    inst Bar_companion of Bar_companion
+
+    ; CHECK-LABEL: firrtl.circuit "Foo"
+    ; CHECK-SAME: annotations = [{class = "[[_:.+]]AugmentedBundleType", [[_:.+]] elements = [{
+    ; CHECK-SAME: "sifive.enterprise.grandcentral.AugmentedStringType"
+    ; CHECK-SAME: "sifive.enterprise.grandcentral.AugmentedBooleanType"
+    ; CHECK-SAME: "sifive.enterprise.grandcentral.AugmentedIntegerType"
+    ; CHECK-SAME: "sifive.enterprise.grandcentral.AugmentedDoubleType"
