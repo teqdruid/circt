@@ -14,17 +14,19 @@ jobs:
     runs-on: ["self-hosted", "1ES.Pool=test-teqdruid"]
     container:
       image: ghcr.io/circt/images/circt-integration-test:v12.2
+      volumes:
+        - /mnt:/__w/circt
     strategy:
       fail-fast: false
       matrix:
-        build-assert: [ON, OFF]
-        build-shared: [ON, OFF]
-        build-type: [Debug, Release]
+        build-assert: [OFF]
+        build-shared: [OFF]
+        build-type: [Debug]
         compiler:
           - cc: clang
             cxx: clang++
-          - cc: gcc
-            cxx: g++
+          # - cc: gcc
+            # cxx: g++
         lit-flags: ['', '--vg']
         exclude:
           - build-type: Debug
@@ -43,6 +45,10 @@ jobs:
             lit-flags: --vg
 
     steps:
+      - name: sysinfo
+        run: |
+          df -h
+
       # Clone the CIRCT repo and its submodules. Do shallow clone to save clone
       # time.
       - name: Get CIRCT
