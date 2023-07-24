@@ -11,7 +11,7 @@ jobs:
   # integration testing prerequisite installed.
   build-circt:
     name: Build and Test
-    runs-on: ubuntu-latest
+    runs-on: ["self-hosted", "1ES.Pool=test-teqdruid"]
     container:
       image: ghcr.io/circt/images/circt-integration-test:v12.2
     strategy:
