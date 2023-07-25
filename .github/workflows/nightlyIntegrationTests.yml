@@ -19,14 +19,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build-assert: [OFF]
-        build-shared: [OFF]
-        build-type: [Debug]
+        build-assert: [OFF, ON]
+        build-shared: [OFF, ON]
+        build-type: [Debug, Release]
         compiler:
           - cc: clang
             cxx: clang++
-          # - cc: gcc
-            # cxx: g++
+          - cc: gcc
+            cxx: g++
         lit-flags: ['', '--vg']
         exclude:
           - build-type: Debug
